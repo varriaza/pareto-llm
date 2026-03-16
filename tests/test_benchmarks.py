@@ -64,3 +64,69 @@ def test_supports_context_padding_defaults_true():
             return BenchmarkResult(score=0.0, extra={}), backend.generate("x")
 
     assert GammaBench.supports_context_padding is True
+
+
+# ── Context-length wrapper ────────────────────────────────────────────────────
+
+from pareto_llm.benchmarks.context_length import ContextLengthBenchmark
+
+
+def test_context_length_is_registered():
+    assert "context_length" in BENCHMARK_REGISTRY
+
+
+def test_context_length_pads_prompt(mock_backend):
+    """The wrapper must pass a longer prompt than the inner benchmark would alone."""
+    captured: list[str] = []
+    original_generate = mock_backend.generate
+
+    def capturing_generate(prompt: str, max_tokens: int = 512):
+        captured.append(prompt)
+        return original_generate(prompt, max_tokens)
+
+    mock_backend.generate = capturing_generate  # type: ignore[method-assign]
+    mock_backend._max_ctx = 200  # small so padding is measurable
+
+    @register("_inner_pad_test")
+    class InnerBench(Benchmark):
+        def run_single(self, backend):
+            gen = backend.generate("short prompt")
+            return BenchmarkResult(score=1.0, extra={}), gen
+
+    bench = ContextLengthBenchmark(
+        config={
+            "fill_ratio": 0.5,
+            "inner_benchmark": "_inner_pad_test",
+            "inner_config": {},
+        }
+    )
+    bench.run_single(mock_backend)
+
+    assert captured, "generate was never called"
+    assert len(captured[0].split()) > len("short prompt".split()), "prompt was not padded"
+
+
+def test_context_length_rejects_unsupported_inner(mock_backend):
+    @register("_no_pad_bench")
+    class NoPadBench(Benchmark):
+        supports_context_padding = False
+
+        def run_single(self, backend):
+            return BenchmarkResult(score=0.0, extra={}), backend.generate("x")
+
+    bench = ContextLengthBenchmark(
+        config={
+            "fill_ratio": 0.25,
+            "inner_benchmark": "_no_pad_bench",
+            "inner_config": {},
+        }
+    )
+    with pytest.raises(ValueError, match="supports_context_padding"):
+        bench.run_single(mock_backend)
+
+
+def test_context_length_invalid_fill_ratio():
+    with pytest.raises(ValueError, match="fill_ratio"):
+        ContextLengthBenchmark(
+            config={"fill_ratio": 1.5, "inner_benchmark": "_inner_pad_test", "inner_config": {}}
+        )
