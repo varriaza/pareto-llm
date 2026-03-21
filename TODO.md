@@ -4,9 +4,9 @@
   - [x] Make sure this file is perpetually updated with each code push
 - [ ] Merge PR
 - [ ] Terminal bench (coding and CLI test)
-  - [ ] Create plan for implementing Terminal Bench (hard)
+  - [ ] Create plan for implementing Terminal Bench (hard version)
     - [ ] See https://harborframework.com/docs/tutorials/running-terminal-bench
-  - [ ] Implement Terminal bench (Hard)
+  - [ ] Implement Terminal bench (Hard version)
   - [ ] Update setup script to install terminal bench
 - [ ] Tau squared also called τ^2 or tau2 (tool calling tests)
   - [ ] Create plan for implementing tau Airline benchmark
@@ -16,7 +16,7 @@
   - [ ] Create plan for implementing tau retail benchmark
     - [ ] See https://github.com/sierra-research/tau2-bench
   - [ ] Implement tau retail benchmark
-- [ ] Live bench (pythong coding tests)
+- [ ] Live bench (python coding tests)
   - [ ] Create plan for implementing live bench python benchmark
     - [ ] See https://github.com/livebench/livebench
   - [ ] Implement live bench python benchmark

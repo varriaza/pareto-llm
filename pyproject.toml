@@ -19,7 +19,7 @@ dependencies = [
 mlx = ["mlx-lm>=0.20"]
 cuda = [
     "llama-cpp-python>=0.2",
-    "pynvml>=11.0",
+    "nvidia-ml-py>=12.0",
 ]
 dev = [
     "pytest>=8.0",

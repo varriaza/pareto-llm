@@ -1,4 +1,5 @@
 """Context-length benchmark: wraps an inner benchmark, padding prompts to a fill ratio."""
+
 from __future__ import annotations
 
 from pareto_llm.backend.base import GenerationResult, LLMBackend
@@ -45,13 +46,14 @@ class ContextLengthBenchmark(Benchmark):
         super().__init__(config)
         fill_ratio = config.get("fill_ratio")
         if fill_ratio is None or not (0.0 < float(fill_ratio) < 1.0):
-            raise ValueError(
-                f"fill_ratio must be between 0 and 1 (exclusive), got {fill_ratio!r}"
-            )
+            raise ValueError(f"fill_ratio must be between 0 and 1 (exclusive), got {fill_ratio!r}")
+        inner_key = config.get("inner_benchmark")
+        if inner_key is None:
+            raise ValueError("inner_benchmark is required")
+        if inner_key not in BENCHMARK_REGISTRY:
+            raise KeyError(f"inner_benchmark '{inner_key}' is not registered. Available: {sorted(BENCHMARK_REGISTRY)}")
 
-    def run_single(
-        self, backend: LLMBackend
-    ) -> tuple[BenchmarkResult, GenerationResult]:
+    def run_single(self, backend: LLMBackend) -> tuple[BenchmarkResult, GenerationResult]:
         inner_key: str = self.config["inner_benchmark"]
         inner_config: dict = self.config.get("inner_config", {})
         fill_ratio: float = self.config["fill_ratio"]

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from pareto_llm.backend.base import GenerationResult, LLMBackend
 
 # Model ID format: "repo_id:filename_pattern"
@@ -51,22 +53,32 @@ class LlamaCppBackend(LLMBackend):
         if self._llama is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 
+        t0 = time.perf_counter()
         output = self._llama.create_completion(
             prompt=prompt,
             max_tokens=max_tokens,
             echo=False,
         )
+        elapsed = time.perf_counter() - t0
 
-        timings = output.get("timings", {})
+        timings = output.get("timings") or {}
         text = output["choices"][0]["text"]
         usage = output.get("usage", {})
 
         prompt_tokens = usage.get("prompt_tokens", 0)
         gen_tokens = usage.get("completion_tokens", 0)
 
-        # llama.cpp timings are in milliseconds
-        prompt_tps = timings.get("prompt_n", 0) / (timings.get("prompt_ms", 1) / 1000)
-        gen_tps = timings.get("predicted_n", 0) / (timings.get("predicted_ms", 1) / 1000)
+        # Prefer llama.cpp's own timing data; fall back to wall-clock if unavailable
+        prompt_tps = (
+            timings.get("prompt_per_second")
+            or (timings.get("prompt_n", 0) / (timings.get("prompt_ms", 1) / 1000))
+            or (prompt_tokens / elapsed if elapsed > 0 else 0.0)
+        )
+        gen_tps = (
+            timings.get("predicted_per_second")
+            or (timings.get("predicted_n", 0) / (timings.get("predicted_ms", 1) / 1000))
+            or (gen_tokens / elapsed if elapsed > 0 else 0.0)
+        )
 
         return GenerationResult(
             text=text,

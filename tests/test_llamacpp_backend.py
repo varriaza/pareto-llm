@@ -2,11 +2,13 @@ import os
 
 import pytest
 
-pytestmark = pytest.mark.cuda
-
-if os.environ.get("GPU_BACKEND") != "cuda":
-    pytest.skip("llama.cpp backend requires Linux + NVIDIA GPU (GPU_BACKEND=cuda)", allow_module_level=True)
-
+pytestmark = [
+    pytest.mark.cuda,
+    pytest.mark.skipif(
+        os.environ.get("GPU_BACKEND") != "cuda",
+        reason="llama.cpp backend requires Linux + NVIDIA GPU (GPU_BACKEND=cuda)",
+    ),
+]
 
 from pareto_llm.backend.llamacpp_backend import LlamaCppBackend  # noqa: E402
 

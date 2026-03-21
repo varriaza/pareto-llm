@@ -1,8 +1,27 @@
+import os
 import pathlib
+import shutil
+import subprocess
 
 import pytest
 
-from pareto_llm.backend.base import GenerationResult, LLMBackend
+
+def _detect_gpu_backend() -> str | None:
+    if shutil.which("nvidia-smi"):
+        try:
+            subprocess.check_call(["nvidia-smi"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            return "cuda"
+        except subprocess.CalledProcessError:
+            pass
+    return None
+
+
+if not os.environ.get("GPU_BACKEND"):
+    detected = _detect_gpu_backend()
+    if detected:
+        os.environ["GPU_BACKEND"] = detected
+
+from pareto_llm.backend.base import GenerationResult, LLMBackend  # noqa: E402
 
 
 class MockBackend(LLMBackend):

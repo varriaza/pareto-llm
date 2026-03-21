@@ -1,4 +1,5 @@
 """Orchestrates the model × benchmark × run_num test matrix."""
+
 from __future__ import annotations
 
 import logging
@@ -32,13 +33,30 @@ def run(
         backend.load(model_id)
         try:
             for bench_entry in config.benchmarks:
+                if bench_entry.type not in BENCHMARK_REGISTRY:
+                    log.warning(
+                        "Skipping benchmark '%s': type '%s' is not registered.",
+                        bench_entry.name,
+                        bench_entry.type,
+                    )
+                    continue
                 bench_cls = BENCHMARK_REGISTRY[bench_entry.type]
-                benchmark = bench_cls(bench_entry.config)
+                try:
+                    benchmark = bench_cls(bench_entry.config)
+                except (KeyError, ValueError) as exc:
+                    log.warning(
+                        "Skipping benchmark '%s': %s",
+                        bench_entry.name,
+                        exc,
+                    )
+                    continue
                 for run_num in range(1, config.defaults.runs_per_test + 1):
                     log.info(
                         "[%s][%s] run %d/%d",
-                        model_id, bench_entry.name,
-                        run_num, config.defaults.runs_per_test,
+                        model_id,
+                        bench_entry.name,
+                        run_num,
+                        config.defaults.runs_per_test,
                     )
                     try:
                         with SystemMetricsCollector(gpu_backend=gpu_backend) as collector:
@@ -56,7 +74,10 @@ def run(
                     except Exception as exc:
                         log.error(
                             "[%s][%s] run %d failed: %s",
-                            model_id, bench_entry.name, run_num, exc,
+                            model_id,
+                            bench_entry.name,
+                            run_num,
+                            exc,
                         )
                         writer.append_failure(
                             run_label=config.run_label,
@@ -74,9 +95,11 @@ def run(
 def _create_backend(gpu_backend: str) -> "LLMBackend":
     if gpu_backend == "mlx":
         from pareto_llm.backend.mlx_backend import MLXBackend
+
         return MLXBackend()
     if gpu_backend == "cuda":
         from pareto_llm.backend.llamacpp_backend import LlamaCppBackend
+
         return LlamaCppBackend()
     raise ValueError(f"Unknown GPU backend: {gpu_backend!r}. Expected 'mlx' or 'cuda'.")
 
@@ -85,15 +108,14 @@ def _delete_hf_cache(model_id: str) -> None:
     """Remove a model's Hugging Face cache files."""
     try:
         from huggingface_hub import scan_cache_dir
+
         cache_info = scan_cache_dir()
         for repo in cache_info.repos:
             if repo.repo_id == model_id or repo.repo_id == model_id.split(":")[0]:
                 for revision in repo.revisions:
                     revision.refs  # ensure loaded
                 # Delete via the strategy API
-                delete_strategy = cache_info.delete_revisions(
-                    *(rev.commit_hash for rev in repo.revisions)
-                )
+                delete_strategy = cache_info.delete_revisions(*(rev.commit_hash for rev in repo.revisions))
                 delete_strategy.execute()
                 log.info("Deleted HF cache for %s", model_id)
                 return

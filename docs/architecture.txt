@@ -1,0 +1,84 @@
+Pareto LLM — Repository Architecture
+======================================
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ENTRY POINTS                                                                ║
+║  ┌──────────────────────────────┐   ┌──────────────────────────────────┐    ║
+║  │ cli.py                       │   │ scripts/init_env.py              │    ║
+║  │ Click CLI                    │   │ Standalone env-setup script      │    ║
+║  │ run / init-env / list-cached │   └──────────────┬───────────────────┘    ║
+║  └──┬───────────────┬───────────┘                  │                        ║
+╚═════╪═══════════════╪══════════════════════════════╪════════════════════════╝
+      │               │                              │
+      │  ╔════════════╪══════════════════════════════╪══════════╗
+      │  ║  CONFIG    │                              │          ║
+      │  ║  ┌─────────▼──────────────┐  ┌───────────▼────────┐ ║
+      │  ║  │ config.py              │  │ _env.py             │ ║
+      │  ║  │ Pydantic schema:       │  │ Detects GPU backend │ ║
+      │  ║  │ BenchmarkConfig /      │  │ writes .env file    │ ║
+      │  ║  │ BenchmarkEntry         │  └─────────────────────┘ ║
+      │  ║  │  ▲                     │                          ║
+      │  ║  │  └── configs/          │                          ║
+      │  ║  │      example.yaml      │                          ║
+      │  ║  └───────────┬────────────┘                          ║
+      │  ╚══════════════╪═══════════════════════════════════════╝
+      │                 │
+      └─────────────────┘
+                        │ BenchmarkConfig
+                        ▼
+╔═══════════════════════════════════════════════════════════════════════════╗
+║  ORCHESTRATION                                                            ║
+║  ┌───────────────────────────────────────────────────────────────────┐   ║
+║  │ runner.py                                                          │   ║
+║  │ Triple loop: models × benchmarks × runs                           │   ║
+║  │ Loads/unloads backend per model · deletes HF cache on request     │   ║
+║  └──┬──────────┬────────────────┬──────────────┬──────────┬──────────┘   ║
+╚═════╪══════════╪════════════════╪══════════════╪══════════╪══════════════╝
+      │          │                │              │          │
+      │ lazy     │ lazy           │ @register    │          │
+      │ (mlx)    │ (cuda)         │ trigger      │          │
+      ▼          ▼                ▼              ▼          ▼
+╔══════════╗  ╔═══════╗  ╔══════════════╗  ╔════════╗  ╔═════════════╗
+║ BACKENDS ║  ║       ║  ║  BENCHMARKS  ║  ║METRICS ║  ║  STORAGE    ║
+║          ║  ║       ║  ║              ║  ║        ║  ║             ║
+║ base.py  ║  ║       ║  ║ base.py      ║  ║system  ║  ║csv_writer   ║
+║ abstract ║  ║       ║  ║ abstract     ║  ║  .py   ║  ║    .py      ║
+║ LLMBackend  ║       ║  ║ Benchmark    ║  ║ 10 Hz  ║  ║ CsvWriter   ║
+║ Generation  ║       ║  ║ BENCHMARK_   ║  ║ bgrd   ║  ║ Append-only ║
+║ Result   ║  ║       ║  ║ REGISTRY     ║  ║ thread ║  ║ CSV output  ║
+║    │     ║  ║       ║  ║ @register    ║  ║ RAM +  ║  ║ Dynamic     ║
+║    │     ║  ║       ║  ║    │         ║  ║ GPU    ║  ║ extra_* cols║
+║  ┌─┴───┐ ║  ║       ║  ║  ┌─┴───────┐ ║  ╚═══╤════╝  ╚═════════════╝
+║  │ MLX │ ║  ║       ║  ║  │context_ │ ║      │ (conditional)
+║  │back │◄╬──╬───────╬──╬──│length.py│ ║  mlx ┤
+║  │end  │ ║  ║       ║  ║  │         │ ║ cuda ─┘
+║  │     │ ║  ║       ║  ║  │Pads     │ ║
+║  │Apple│ ║  ║       ║  ║  │prompt   │ ║
+║  │Metal│ ║  ║       ║  ║  │fill_    │ ║
+║  ├─────┤ ║  ║       ║  ║  │ratio    │ ║
+║  │llama│ ║  ║       ║  ║  └─────────┘ ║
+║  │cpp  │ ║  ║       ║  ║              ║
+║  │back │ ║  ║       ║  ║ __init__.py  ║
+║  │end  │ ║  ║       ║  ║ (triggers    ║
+║  │     │ ║  ║       ║  ║ @register    ║
+║  │NVDIA│ ║  ║       ║  ║ side-effect) ║
+║  │CUDA │ ║  ║       ║  ╚══════════════╝
+║  └─────┘ ║  ╚═══════╝
+╚══════════╝
+
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  TESTS                                                                       ║
+║                                                                              ║
+║  conftest.py ─────────────────────────► test_runner.py                      ║
+║  MockBackend fixture                    Full orchestration loop              ║
+║  tmp_csv_path            └────────────► test_benchmarks.py                  ║
+║  sample_config_dict                     Registry + context-length wrapper    ║
+║                                                                              ║
+║  test_env.py        test_config.py      test_metrics.py    test_storage.py  ║
+║  tests _env.py      tests config.py     tests system.py    tests csv_writer ║
+║                     + example.yaml                                           ║
+║                                                                              ║
+║  test_mlx_backend.py                   test_llamacpp_backend.py             ║
+║  Real MLX tests (@pytest.mark.mlx)     Real llama.cpp tests                 ║
+║                                        (@pytest.mark.cuda)                  ║
+╚══════════════════════════════════════════════════════════════════════════════╝
