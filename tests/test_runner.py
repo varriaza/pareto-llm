@@ -13,18 +13,20 @@ from pareto_llm.benchmarks.base import (
 from pareto_llm.config import BenchmarkConfig, BenchmarkEntry, Defaults
 from pareto_llm.runner import run
 
-
 # ── Test-only benchmark fixtures ──────────────────────────────────────────────
+
 
 @pytest.fixture(autouse=True)
 def _register_runner_mock():
     key = "_runner_mock"
     if key not in BENCHMARK_REGISTRY:
+
         @register(key)
         class RunnerMockBench(Benchmark):
             def run_single(self, backend):
                 gen = backend.generate("test prompt")
                 return BenchmarkResult(score=0.75, extra={"detail": "ok"}), gen
+
     yield
 
 
@@ -38,9 +40,7 @@ def _cfg(
         run_label="test_run",
         defaults=Defaults(runs_per_test=runs, keep_model_files=keep),
         models=models,
-        benchmarks=[
-            BenchmarkEntry(type="_runner_mock", name=n, config={}) for n in bench_names
-        ],
+        benchmarks=[BenchmarkEntry(type="_runner_mock", name=n, config={}) for n in bench_names],
     )
 
 
@@ -49,6 +49,7 @@ def _rows(path: pathlib.Path) -> list[dict]:
 
 
 # ── Row counts ────────────────────────────────────────────────────────────────
+
 
 def test_2_models_2_benches_2_runs_gives_8_rows(tmp_csv_path, mock_backend):
     cfg = _cfg(["m/a", "m/b"], ["bench1", "bench2"], runs=2)
@@ -67,6 +68,7 @@ def test_run_num_increments_per_model_benchmark(tmp_csv_path, mock_backend):
 
 
 # ── Backend lifecycle ─────────────────────────────────────────────────────────
+
 
 def test_backend_unload_called_once_per_model(tmp_csv_path, mock_backend):
     cfg = _cfg(["m/a", "m/b"], ["bench1"], runs=1)
@@ -94,10 +96,12 @@ def test_delete_cache_not_called_when_keep_true(tmp_csv_path, mock_backend):
 
 # ── Error handling ────────────────────────────────────────────────────────────
 
+
 def test_exception_writes_failure_row_and_continues(tmp_csv_path, mock_backend):
     call_count = 0
 
     if "_runner_flaky" not in BENCHMARK_REGISTRY:
+
         @register("_runner_flaky")
         class FlakyBench(Benchmark):
             def run_single(self, backend):
@@ -120,9 +124,9 @@ def test_exception_writes_failure_row_and_continues(tmp_csv_path, mock_backend):
 
     rows = _rows(tmp_csv_path)
     assert len(rows) == 2
-    assert rows[0]["score"] == ""                        # failure row
+    assert rows[0]["score"] == ""  # failure row
     assert "transient error" in rows[0]["extra_error"]
-    assert rows[1]["score"] == "1.0"                     # success row
+    assert rows[1]["score"] == "1.0"  # success row
 
 
 def test_exception_does_not_skip_other_benchmarks(tmp_csv_path, mock_backend):

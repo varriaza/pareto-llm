@@ -1,4 +1,5 @@
 """MLX inference backend for Apple Silicon (Metal GPU)."""
+
 from __future__ import annotations
 
 import time
@@ -15,11 +16,11 @@ class MLXBackend(LLMBackend):
 
     def load(self, model_id: str) -> None:
         from mlx_lm import load  # type: ignore[import]
+
         self._model, self._tokenizer = load(model_id)
 
     def generate(self, prompt: str, max_tokens: int = 512) -> GenerationResult:
         from mlx_lm import generate  # type: ignore[import]
-        import mlx.core as mx  # type: ignore[import]
 
         # Tokenize to count prompt tokens
         prompt_ids = self._tokenizer.encode(prompt)
@@ -57,6 +58,7 @@ class MLXBackend(LLMBackend):
         # Clear MLX memory
         try:
             import mlx.core as mx  # type: ignore[import]
+
             mx.metal.clear_cache()
         except Exception:
             pass

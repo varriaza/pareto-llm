@@ -1,4 +1,5 @@
 """llama.cpp inference backend for Linux + NVIDIA (CUDA)."""
+
 from __future__ import annotations
 
 from pareto_llm.backend.base import GenerationResult, LLMBackend
@@ -15,8 +16,8 @@ class LlamaCppBackend(LLMBackend):
         self._model_id: str | None = None
 
     def load(self, model_id: str) -> None:
-        from llama_cpp import Llama  # type: ignore[import]
         from huggingface_hub import hf_hub_download, list_repo_files
+        from llama_cpp import Llama  # type: ignore[import]
 
         self._model_id = model_id
 
@@ -29,10 +30,7 @@ class LlamaCppBackend(LLMBackend):
         # Find the GGUF file whose name contains the pattern (case-insensitive)
         pattern_lower = pattern.lower()
         all_files = list(list_repo_files(repo_id))
-        gguf_files = [
-            f for f in all_files
-            if f.endswith(".gguf") and pattern_lower in f.lower()
-        ]
+        gguf_files = [f for f in all_files if f.endswith(".gguf") and pattern_lower in f.lower()]
         if not gguf_files:
             raise FileNotFoundError(
                 f"No GGUF file matching '{pattern}' found in {repo_id}. "
