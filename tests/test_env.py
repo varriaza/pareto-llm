@@ -56,6 +56,40 @@ def test_write_env_overwrites_existing(tmp_path):
     assert "old_value" not in content
 
 
+def test_write_env_includes_harbor_results_dir(tmp_path):
+    env_path = tmp_path / ".env"
+    with (
+        patch.object(env_mod.shutil, "which", return_value="/usr/bin/harbor"),
+        patch.object(env_mod.subprocess, "run", return_value=MagicMock(returncode=0)),
+    ):
+        env_mod.write_env(env_path, "mlx")
+    assert "HARBOR_RESULTS_DIR=./results/harbor" in env_path.read_text()
+
+
+def test_write_env_warns_harbor_missing(tmp_path, capsys):
+    env_path = tmp_path / ".env"
+    with (
+        patch.object(env_mod.shutil, "which", return_value=None),
+        patch.object(env_mod.subprocess, "run", return_value=MagicMock(returncode=0)),
+    ):
+        env_mod.write_env(env_path, "mlx")
+    out = capsys.readouterr().out
+    assert "[WARNING]" in out
+    assert "harbor" in out.lower()
+
+
+def test_write_env_warns_docker_not_running(tmp_path, capsys):
+    env_path = tmp_path / ".env"
+    with (
+        patch.object(env_mod.shutil, "which", return_value="/usr/bin/harbor"),
+        patch.object(env_mod.subprocess, "run", return_value=MagicMock(returncode=1)),
+    ):
+        env_mod.write_env(env_path, "mlx")
+    out = capsys.readouterr().out
+    assert "[WARNING]" in out
+    assert "docker" in out.lower()
+
+
 def test_env_excluded_from_gitignore():
     gitignore = pathlib.Path(__file__).parent.parent / ".gitignore"
     assert gitignore.exists()

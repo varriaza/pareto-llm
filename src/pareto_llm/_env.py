@@ -1,4 +1,5 @@
 """GPU backend detection and .env file writing."""
+
 import pathlib
 import platform
 import shutil
@@ -15,16 +16,25 @@ def detect_gpu_backend() -> str:
             return "cuda"
         except subprocess.CalledProcessError:
             pass
-    raise RuntimeError(
-        "No supported GPU found. Requires Apple Silicon (Metal) or NVIDIA (CUDA)."
-    )
+    raise RuntimeError("No supported GPU found. Requires Apple Silicon (Metal) or NVIDIA (CUDA).")
 
 
 def write_env(path: pathlib.Path, gpu_backend: str) -> None:
+    if not shutil.which("harbor"):
+        print("[WARNING] harbor not found. Install with: uv tool install harbor")
+
+    try:
+        result = subprocess.run(["docker", "info"], capture_output=True, timeout=10)
+        if result.returncode != 0:
+            print("[WARNING] Docker daemon not running. Terminal Bench requires Docker.")
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        print("[WARNING] Docker daemon not running. Terminal Bench requires Docker.")
+
     content = (
         "# Auto-generated — do not commit\n"
         f"GPU_BACKEND={gpu_backend}\n"
         "RESULTS_DIR=./results\n"
+        "HARBOR_RESULTS_DIR=./results/harbor\n"
         "KEEP_MODEL_FILES=false\n"
     )
     path.write_text(content)
