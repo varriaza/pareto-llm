@@ -1,0 +1,23 @@
+
+- [x] Verify RESULTS.md changes
+- [x] Make a mermaid diagram of files in this repo that shows at a high level what the file does and how it connects to other files
+  - [x] Make sure this file is perpetually updated with each code push
+- [ ] Merge PR
+- [ ] Terminal bench (coding and CLI test)
+  - [ ] Create plan for implementing Terminal Bench (hard)
+    - [ ] See https://harborframework.com/docs/tutorials/running-terminal-bench
+  - [ ] Implement Terminal bench (Hard)
+  - [ ] Update setup script to install terminal bench
+- [ ] Tau squared also called τ^2 or tau2 (tool calling tests)
+  - [ ] Create plan for implementing tau Airline benchmark
+    - [ ] See https://github.com/sierra-research/tau2-bench
+  - [ ] Implement tau airline benchmark
+  - [ ] Update setup script to install tau2
+  - [ ] Create plan for implementing tau retail benchmark
+    - [ ] See https://github.com/sierra-research/tau2-bench
+  - [ ] Implement tau retail benchmark
+- [ ] Live bench (pythong coding tests)
+  - [ ] Create plan for implementing live bench python benchmark
+    - [ ] See https://github.com/livebench/livebench
+  - [ ] Implement live bench python benchmark
+  - [ ] Update setup script to install live bench

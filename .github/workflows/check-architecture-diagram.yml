@@ -1,0 +1,33 @@
+name: Check architecture diagram
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  check-diagram:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fail if src/ changed but docs/architecture.md did not
+        run: |
+          BASE=${{ github.event.pull_request.base.sha }}
+          HEAD=${{ github.event.pull_request.head.sha }}
+
+          src_changed=$(git diff --name-only "$BASE" "$HEAD" | grep '^src/' || true)
+          diagram_changed=$(git diff --name-only "$BASE" "$HEAD" | grep '^docs/architecture.md' || true)
+
+          if [ -n "$src_changed" ] && [ -z "$diagram_changed" ]; then
+            echo "❌ src/ files were changed but docs/architecture.md was not updated."
+            echo ""
+            echo "Changed src files:"
+            echo "$src_changed"
+            echo ""
+            echo "Please update docs/architecture.md to reflect any structural changes."
+            exit 1
+          fi
+
+          echo "✅ Architecture diagram is up to date."
