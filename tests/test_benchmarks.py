@@ -7,9 +7,10 @@ from pareto_llm.benchmarks.base import (
     BenchmarkResult,
     register,
 )
-
+from pareto_llm.benchmarks.context_length import ContextLengthBenchmark
 
 # ── Registry ──────────────────────────────────────────────────────────────────
+
 
 def test_register_adds_class_to_registry():
     @register("_test_alpha")
@@ -28,6 +29,7 @@ def test_duplicate_register_raises():
             return BenchmarkResult(score=0.0, extra={}), backend.generate("x")
 
     with pytest.raises(KeyError, match="_test_dup"):
+
         @register("_test_dup")
         class DupB(Benchmark):
             def run_single(self, backend):
@@ -67,8 +69,6 @@ def test_supports_context_padding_defaults_true():
 
 
 # ── Context-length wrapper ────────────────────────────────────────────────────
-
-from pareto_llm.benchmarks.context_length import ContextLengthBenchmark
 
 
 def test_context_length_is_registered():
@@ -127,6 +127,4 @@ def test_context_length_rejects_unsupported_inner(mock_backend):
 
 def test_context_length_invalid_fill_ratio():
     with pytest.raises(ValueError, match="fill_ratio"):
-        ContextLengthBenchmark(
-            config={"fill_ratio": 1.5, "inner_benchmark": "_inner_pad_test", "inner_config": {}}
-        )
+        ContextLengthBenchmark(config={"fill_ratio": 1.5, "inner_benchmark": "_inner_pad_test", "inner_config": {}})
