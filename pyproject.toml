@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pareto-llm"
 version = "0.1.0"
-requires-python = ">=3.11"
+requires-python = ">=3.13"
 dependencies = [
     "click>=8.1",
     "pydantic>=2.0",
@@ -26,6 +26,9 @@ dev = [
     "pytest-cov>=5.0",
     "ruff>=0.4",
     "mypy>=1.10",
+]
+terminal-bench = [
+    "harbor>=0.1",
 ]
 
 [project.scripts]
