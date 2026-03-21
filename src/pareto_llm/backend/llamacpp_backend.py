@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
+import threading
 import time
+import urllib.request
 
 from pareto_llm.backend.base import GenerationResult, LLMBackend
 
@@ -95,3 +98,35 @@ class LlamaCppBackend(LLMBackend):
         if self._llama is None:
             raise RuntimeError("Model not loaded. Call load() first.")
         return self._llama.n_ctx()
+
+    @contextlib.contextmanager
+    def serve_openai(self, port: int):
+        if self._llama is None:
+            raise RuntimeError("Model not loaded. Call load() first.")
+
+        import uvicorn  # type: ignore[import]
+        from llama_cpp.server.app import create_app  # type: ignore[import]
+
+        app = create_app(llama=self._llama)
+        config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
+        server = uvicorn.Server(config)
+        thread = threading.Thread(target=server.run, daemon=True)
+        thread.start()
+
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            try:
+                urllib.request.urlopen(f"http://localhost:{port}/v1/models", timeout=1)
+                break
+            except Exception:
+                time.sleep(0.5)
+        else:
+            server.should_exit = True
+            thread.join(timeout=5)
+            raise TimeoutError(f"Server on port {port} did not become healthy within 30s")
+
+        try:
+            yield
+        finally:
+            server.should_exit = True
+            thread.join(timeout=10)
