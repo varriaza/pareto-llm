@@ -1,3 +1,4 @@
+import contextlib
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
@@ -7,8 +8,8 @@ class GenerationResult:
     text: str
     prompt_tokens: int
     gen_tokens: int
-    prompt_tps: float   # prompt-processing tokens/sec
-    gen_tps: float      # generation tokens/sec
+    prompt_tps: float  # prompt-processing tokens/sec
+    gen_tps: float  # generation tokens/sec
 
 
 class LLMBackend(ABC):
@@ -23,3 +24,6 @@ class LLMBackend(ABC):
 
     @abstractmethod
     def max_context_tokens(self) -> int: ...
+
+    @abstractmethod
+    def serve_openai(self, port: int) -> contextlib.AbstractContextManager[None]: ...

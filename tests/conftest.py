@@ -1,3 +1,4 @@
+import contextlib
 import os
 import pathlib
 import shutil
@@ -50,6 +51,9 @@ class MockBackend(LLMBackend):
 
     def max_context_tokens(self) -> int:
         return self._max_ctx
+
+    def serve_openai(self, port: int):
+        return contextlib.nullcontext()
 
 
 @pytest.fixture
