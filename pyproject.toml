@@ -36,3 +36,8 @@ packages = ["src/pareto_llm"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]
+
+[dependency-groups]
+dev = [
+    "pre-commit>=4.5.1",
+]
