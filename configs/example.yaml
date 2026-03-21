@@ -38,3 +38,18 @@ benchmarks:
       inner_benchmark: coding
       inner_config:
         sample_size: 5
+
+  # Terminal Bench 2.0 — agentic tasks (medium + hard difficulty)
+  # Requires: pip install pareto-llm[terminal-bench]  AND  Docker running
+  # Note: set runs_per_test: 1 — each call triggers a full Harbor job
+  - type: terminal_bench
+    name: tbench_medium_hard
+    config:
+      difficulties: ["medium", "hard"]
+      port: 8765
+      harbor_agent: terminus-2
+      sample_size: 20        # optional: random 20-task subset
+      seed: 42               # seed for sample_size reproducibility
+      dataset_version: "2.0"
+      jobs_dir: ./results/harbor
+      n_concurrent: 4
