@@ -1,0 +1,23 @@
+run_label: terminal_bench_run
+
+defaults:
+  runs_per_test: 1        # each call triggers a full Harbor job — don't repeat
+  keep_model_files: true
+
+models:
+  - bartowski/Qwen2.5-Coder-14B-Instruct-GGUF:Q4_K_M
+
+benchmarks:
+  - type: terminal_bench
+    name: tbench_medium_hard
+    config:
+      # difficulties: ["medium", "hard"]
+      difficulties: ["easy"]
+      port: 8765
+      harbor_agent: terminus-2
+      dataset_version: "2.0"
+      jobs_dir: ./results/harbor
+      n_concurrent: 4
+      n_ctx: 8192
+      sample_size: 1
+      seed: 42

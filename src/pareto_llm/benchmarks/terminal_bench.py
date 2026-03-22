@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures
 import importlib.util
 import logging
 import math
+import os
 import random
 import socket
 import tomllib
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 
@@ -33,6 +36,7 @@ class TerminalBenchmark(Benchmark):
         "dataset_version": "2.0",
         "jobs_dir": "./results/harbor",
         "n_concurrent": 4,
+        "n_ctx": 8192,
     }
 
     def __init__(self, config: dict) -> None:
@@ -56,6 +60,17 @@ class TerminalBenchmark(Benchmark):
         if sample_size is not None and sample_size <= 0:
             raise ValueError(f"sample_size must be > 0, got {sample_size}")
 
+    @staticmethod
+    def _fetch_difficulty(task_ref) -> str:
+        repo = task_ref.git_url.replace("https://github.com/", "").replace(".git", "")
+        url = f"https://raw.githubusercontent.com/{repo}/{task_ref.git_commit_id}/{task_ref.path}/task.toml"
+        try:
+            data = urllib.request.urlopen(url, timeout=10).read()
+            cfg = tomllib.loads(data.decode())
+            return cfg.get("metadata", {}).get("difficulty", "unknown")
+        except Exception:
+            return "unknown"
+
     def _get_filtered_tasks(self) -> list:
         from harbor.models.registry import RemoteRegistryInfo
         from harbor.models.trial.config import TaskConfig
@@ -65,15 +80,19 @@ class TerminalBenchmark(Benchmark):
         client = RegistryClientFactory.create(registry)
         dataset_spec = client.get_dataset_spec("terminal-bench", self.config["dataset_version"])
 
-        filtered: list[TaskConfig] = []
-        for task_ref in dataset_spec.tasks:
-            task_id = task_ref.to_source_task_id()
-            config_path = task_id.path / "task.toml"
-            if config_path.exists():
-                cfg = tomllib.loads(config_path.read_text())
-                difficulty = cfg.get("metadata", {}).get("difficulty", "unknown")
-                if difficulty in self.config["difficulties"]:
-                    filtered.append(TaskConfig(path=task_id.path))
+        _logger.info("Fetching task metadata for %d tasks…", len(dataset_spec.tasks))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=20) as pool:
+            difficulties = list(pool.map(self._fetch_difficulty, dataset_spec.tasks))
+
+        filtered: list[TaskConfig] = [
+            TaskConfig(
+                path=task_ref.path,
+                git_url=task_ref.git_url,
+                git_commit_id=task_ref.git_commit_id,
+            )
+            for task_ref, difficulty in zip(dataset_spec.tasks, difficulties)
+            if difficulty in self.config["difficulties"]
+        ]
 
         sample_size = self.config["sample_size"]
         if sample_size is not None:
@@ -115,13 +134,16 @@ class TerminalBenchmark(Benchmark):
                 AgentConfig(
                     name=self.config["harbor_agent"],
                     model_name="openai/local",
-                    kwargs={"api_base": f"http://localhost:{port}"},
+                    kwargs={"api_base": f"http://localhost:{port}/v1"},
                 )
             ],
             tasks=filtered_tasks,
         )
 
-        with backend.serve_openai(port):
+        # LiteLLM requires OPENAI_API_KEY to be set even for local servers.
+        os.environ.setdefault("OPENAI_API_KEY", "local")
+
+        with backend.serve_openai(port, n_ctx=self.config["n_ctx"]):
             job = Job(job_config)
             asyncio.run(job.run())
 

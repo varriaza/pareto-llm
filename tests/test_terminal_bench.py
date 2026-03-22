@@ -70,11 +70,12 @@ def test_supports_context_padding_is_false():
 # ─── Task filtering ───────────────────────────────────────────────────────────
 
 
-def _make_task_ref(path: pathlib.Path):
-    source = MagicMock()
-    source.path = path
+def _make_task_ref(path: pathlib.Path, difficulty: str):
     ref = MagicMock()
-    ref.to_source_task_id.return_value = source
+    ref.path = path
+    ref.git_url = "https://github.com/fake/repo.git"
+    ref.git_commit_id = "abc123"
+    ref._difficulty = difficulty
     return ref
 
 
@@ -85,23 +86,35 @@ def _write_task_toml(tmp_path: pathlib.Path, name: str, difficulty: str) -> path
     return task_dir
 
 
-def _mock_registry(dirs):
+def _mock_registry(dirs_and_difficulties):
     mock_dataset_spec = MagicMock()
-    mock_dataset_spec.tasks = [_make_task_ref(d) for d in dirs]
+    mock_dataset_spec.tasks = [_make_task_ref(d, diff) for d, diff in dirs_and_difficulties]
     mock_client = MagicMock()
     mock_client.get_dataset_spec.return_value = mock_dataset_spec
     return mock_client
+
+
+def _fetch_difficulty_from_ref(task_ref):
+    """Test-only stand-in for _fetch_difficulty that reads the mock _difficulty attribute."""
+    return task_ref._difficulty
+
+
+_PATCH_FETCH = patch(
+    "pareto_llm.benchmarks.terminal_bench.TerminalBenchmark._fetch_difficulty",
+    staticmethod(_fetch_difficulty_from_ref),
+)
 
 
 def test_filtering_selects_correct_difficulties(tmp_path):
     easy_dir = _write_task_toml(tmp_path, "easy", "easy")
     medium_dir = _write_task_toml(tmp_path, "medium", "medium")
     hard_dir = _write_task_toml(tmp_path, "hard", "hard")
-    mock_client = _mock_registry([easy_dir, medium_dir, hard_dir])
+    mock_client = _mock_registry([(easy_dir, "easy"), (medium_dir, "medium"), (hard_dir, "hard")])
 
     with (
         patch("harbor.registry.client.RegistryClientFactory") as mock_factory,
         patch("harbor.models.registry.RemoteRegistryInfo"),
+        _PATCH_FETCH,
     ):
         mock_factory.create.return_value = mock_client
         bench = TerminalBenchmark(_valid_config(difficulties=["medium", "hard"]))
@@ -115,12 +128,13 @@ def test_filtering_selects_correct_difficulties(tmp_path):
 
 
 def test_sample_size_limits_tasks(tmp_path):
-    dirs = [_write_task_toml(tmp_path, f"task_{i}", "hard") for i in range(10)]
+    dirs = [(d, "hard") for d in [_write_task_toml(tmp_path, f"task_{i}", "hard") for i in range(10)]]
     mock_client = _mock_registry(dirs)
 
     with (
         patch("harbor.registry.client.RegistryClientFactory") as mock_factory,
         patch("harbor.models.registry.RemoteRegistryInfo"),
+        _PATCH_FETCH,
     ):
         mock_factory.create.return_value = mock_client
         bench = TerminalBenchmark(_valid_config(difficulties=["hard"], sample_size=5, seed=42))
@@ -130,13 +144,14 @@ def test_sample_size_limits_tasks(tmp_path):
 
 
 def test_sample_size_is_deterministic(tmp_path):
-    dirs = [_write_task_toml(tmp_path, f"task_{i}", "hard") for i in range(10)]
+    dirs = [(d, "hard") for d in [_write_task_toml(tmp_path, f"task_{i}", "hard") for i in range(10)]]
 
     def run():
         mock_client = _mock_registry(dirs)
         with (
             patch("harbor.registry.client.RegistryClientFactory") as mock_factory,
             patch("harbor.models.registry.RemoteRegistryInfo"),
+            _PATCH_FETCH,
         ):
             mock_factory.create.return_value = mock_client
             bench = TerminalBenchmark(_valid_config(difficulties=["hard"], sample_size=5, seed=42))
@@ -146,13 +161,14 @@ def test_sample_size_is_deterministic(tmp_path):
 
 
 def test_sample_size_exceeds_available_uses_all(tmp_path, caplog):
-    dirs = [_write_task_toml(tmp_path, f"task_{i}", "hard") for i in range(3)]
+    dirs = [(d, "hard") for d in [_write_task_toml(tmp_path, f"task_{i}", "hard") for i in range(3)]]
     mock_client = _mock_registry(dirs)
 
     with (
         patch("harbor.registry.client.RegistryClientFactory") as mock_factory,
         patch("harbor.models.registry.RemoteRegistryInfo"),
         caplog.at_level(logging.WARNING),
+        _PATCH_FETCH,
     ):
         mock_factory.create.return_value = mock_client
         bench = TerminalBenchmark(_valid_config(difficulties=["hard"], sample_size=10))
@@ -164,11 +180,12 @@ def test_sample_size_exceeds_available_uses_all(tmp_path, caplog):
 
 def test_zero_filtered_tasks_raises(tmp_path):
     easy_dir = _write_task_toml(tmp_path, "easy", "easy")
-    mock_client = _mock_registry([easy_dir])
+    mock_client = _mock_registry([(easy_dir, "easy")])
 
     with (
         patch("harbor.registry.client.RegistryClientFactory") as mock_factory,
         patch("harbor.models.registry.RemoteRegistryInfo"),
+        _PATCH_FETCH,
     ):
         mock_factory.create.return_value = mock_client
         bench = TerminalBenchmark(_valid_config(difficulties=["hard"]))

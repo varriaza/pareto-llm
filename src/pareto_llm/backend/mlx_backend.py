@@ -69,7 +69,7 @@ class MLXBackend(LLMBackend):
             pass
 
     @contextlib.contextmanager
-    def serve_openai(self, port: int):
+    def serve_openai(self, port: int, n_ctx: int = 8192):
         if self._model is None:
             raise RuntimeError("Model not loaded. Call load() first.")
 

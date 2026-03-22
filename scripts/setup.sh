@@ -14,23 +14,20 @@ uv run python scripts/init_env.py
 GPU_BACKEND=$(grep '^GPU_BACKEND=' .env 2>/dev/null | cut -d= -f2 | tr -d '"' || true)
 
 if [ "${GPU_BACKEND}" = "cuda" ]; then
-    echo "==> Installing CUDA extras (llama-cpp-python pre-built wheel)..."
-    if ! uv pip install "pareto-llm[cuda]" \
-        --index "https://abetlen.github.io/llama-cpp-python/whl/cu124" \
-        --index-strategy unsafe-best-match; then
+    echo "==> Installing CUDA extras (building llama-cpp-python from source)..."
+    echo "    Note: pre-built wheels are not available for Python 3.13 — source build required."
+    echo "    This requires the CUDA Toolkit and build tools (cmake, gcc). This may take a few minutes."
+    echo ""
+    echo "    If you see a 'cospi/sinpi noexcept' compile error with CUDA 12.8 + glibc 2.41,"
+    echo "    run: python3 scripts/patch_cuda_math.py  (then re-run setup)"
+    echo ""
+    if ! CMAKE_ARGS="-DGGML_CUDA=on" uv pip install "pareto-llm[cuda]" --no-cache-dir; then
         echo ""
-        echo "ERROR: Failed to install llama-cpp-python."
+        echo "ERROR: Failed to build llama-cpp-python from source."
         echo ""
-        echo "The pre-built wheel was not available for your platform."
-        echo "To build from source you need the CUDA Toolkit:"
-        echo ""
-        echo "  # Debian/Ubuntu (WSL2):"
-        echo "  sudo apt-get install cuda-toolkit-12-4"
-        echo "  export PATH=/usr/local/cuda-12.4/bin:\$PATH"
-        echo "  export LD_LIBRARY_PATH=/usr/local/cuda-12.4/lib64:\$LD_LIBRARY_PATH"
-        echo ""
-        echo "  Then re-run:"
-        echo "  CMAKE_ARGS=\"-DGGML_CUDA=on\" uv pip install \"pareto-llm[cuda]\""
+        echo "Prerequisites:"
+        echo "  sudo apt-get install cuda-toolkit cmake gcc g++"
+        echo "  export PATH=/usr/local/cuda/bin:\$PATH"
         echo ""
         echo "  Full CUDA Toolkit downloads: https://developer.nvidia.com/cuda-downloads"
         exit 1
