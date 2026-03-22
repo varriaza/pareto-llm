@@ -34,12 +34,18 @@ dev = [
 terminal-bench = [
     "harbor>=0.1",
 ]
+live-bench = [
+    "livebench @ git+https://github.com/livebench/livebench.git@18b524d2d3a32282300b3548ef69e7d904ece836",
+]
 
 [project.scripts]
 pareto-llm = "pareto_llm.cli:cli"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/pareto_llm"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.ruff]
 line-length = 120
