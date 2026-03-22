@@ -54,7 +54,7 @@ benchmarks:
       seed: 42                     # seed for sample reproducibility
       skip_agentic: true           # skip Docker-dependent agentic coding tasks
       n_ctx: 8192
-      parallel: 4                  # concurrent API requests to local server
+      parallel: 4                  # concurrent API requests to local server (named "parallel" to match LiveBench's own --parallel CLI arg)
       jobs_dir: ./results/livebench
 ```
 
@@ -75,7 +75,7 @@ benchmarks:
 
 ### Validation (in `__init__`, config checks before livebench availability check)
 
-- `categories` must be `"all"` or a non-empty list of valid category names
+- `categories` must be `"all"` or a **non-empty** list of valid category names; an empty list raises `ValueError` immediately in `__init__` (not deferred to `_get_filtered_questions()`)
 - `port` must be between 1024 and 65535
 - `sample_size` must be `null` or > 0
 - `sample_size_per_category` values must be > 0
@@ -91,12 +91,14 @@ benchmarks:
 
 New file. Key class: `LiveBenchBenchmark` decorated with `@register("live_bench")`.
 
+**Import discipline:** No livebench symbol is imported at module scope. All `import livebench.*` statements are inside method bodies (same pattern as `terminal_bench.py` with `harbor`). This ensures the module is importable — and `@register("live_bench")` fires — even when the `live-bench` extra is not installed.
+
 **`__init__(config)`**
 - Merges config with `DEFAULTS`
 - Validates all fields (config checks first, livebench import check last)
 
 **`_get_filtered_questions()`**
-- Imports livebench question-loading utilities
+- Imports livebench question-loading utilities inside the method body
 - Loads questions for selected categories and release date from HuggingFace
 - Filters out agentic questions if `skip_agentic=True`
 - Applies `sample_size` and `sample_size_per_category` subsampling with seed
@@ -106,11 +108,14 @@ New file. Key class: `LiveBenchBenchmark` decorated with `@register("live_bench"
 - Checks port availability
 - Calls `_get_filtered_questions()`
 - Sets `OPENAI_API_KEY` env var (LiteLLM requirement for local servers)
+- Generates a timestamped `run_name` (e.g. `lbench_20260321_153042_123456`) to scope output files; same pattern as `TerminalBenchmark`'s `tbench_{datetime}`
 - Uses `backend.serve_openai(port, n_ctx=n_ctx)` context manager for inference phase
-- Calls `run_questions()` with `api_base=http://localhost:{port}/v1`
+- Calls `run_questions()` with `api_base=http://localhost:{port}/v1` and `answer_file` rooted under `jobs_dir/run_name/`
 - After server shuts down: calls judgment/scoring functions
-- Reads judgment JSONL files; computes per-category and overall mean scores
+- Reads judgment JSONL files from known paths under `jobs_dir/run_name/`; computes per-category and overall mean scores
 - Returns `(BenchmarkResult, GenerationResult)`
+
+**Note on LiveBench file paths:** The exact paths where `run_questions()` and `gen_ground_truth_judgment()` write files must be verified against the pinned LiveBench version at implementation time. If LiveBench's API does not accept an `answer_file` or `bench_dir` override that scopes output under `jobs_dir/run_name/`, use a `tempfile.mkdtemp()` working directory instead and copy/read results from there. The aggregation step must glob for `**/ground_truth_judgment.jsonl` under the run directory rather than assuming a hardcoded path.
 
 ### `src/pareto_llm/benchmarks/__init__.py`
 
@@ -129,7 +134,7 @@ live-bench = [
 ]
 ```
 
-Tag/commit to be pinned at implementation time to latest stable release.
+Tag/commit to be pinned at implementation time to latest stable release. **Risk:** `uv sync` hard-fails if the git ref does not exist. The implementer must verify the pinned ref resolves successfully before merging, including in CI. Add `--extra live-bench` to CI's `uv sync` line only after the ref is confirmed valid.
 
 ### `configs/live_bench.yaml`
 
@@ -147,7 +152,7 @@ Or as an interactive prompt — to be decided at implementation time.
 
 ### `.github/workflows/ci.yml`
 
-Add `--extra live-bench` to the `uv sync` install step so CI has livebench available for tests.
+Add `--extra live-bench` to the `uv sync` install step so CI has livebench available for tests. This must only be done after the pinned git ref in `pyproject.toml` is confirmed resolvable, otherwise `uv sync` will fail the CI pipeline entirely.
 
 ---
 
@@ -188,14 +193,14 @@ _get_filtered_questions()
 backend.serve_openai(port, n_ctx)   ← server starts
        ↓
 run_questions(questions, api_base=http://localhost:{port}/v1, parallel=N)
-  → jobs_dir/{run_name}/{category}/{task}/model_answer/{model}.jsonl
+  → jobs_dir/{run_name}/**/model_answer/{model}.jsonl  (exact structure verified at impl time)
        ↓
 server shuts down
        ↓
 gen_ground_truth_judgment(...)
-  → jobs_dir/{run_name}/{category}/{task}/model_judgment/ground_truth_judgment.jsonl
+  → jobs_dir/{run_name}/**/model_judgment/ground_truth_judgment.jsonl  (exact structure verified at impl time)
        ↓
-read judgment files
+glob for ground_truth_judgment.jsonl under jobs_dir/run_name/
   → per_category_scores: {coding: 0.65, math: 0.42, ...}
   → overall_score: mean of all question scores
        ↓
