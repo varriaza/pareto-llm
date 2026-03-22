@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
+import subprocess
 import time
+import urllib.request
 
 from pareto_llm.backend.base import GenerationResult, LLMBackend
 
@@ -16,6 +19,7 @@ class LlamaCppBackend(LLMBackend):
     def __init__(self) -> None:
         self._llama = None
         self._model_id: str | None = None
+        self._model_path: str | None = None
 
     def load(self, model_id: str) -> None:
         from huggingface_hub import hf_hub_download, list_repo_files
@@ -41,6 +45,7 @@ class LlamaCppBackend(LLMBackend):
         filename = gguf_files[0]
 
         local_path = hf_hub_download(repo_id=repo_id, filename=filename)
+        self._model_path = local_path
 
         self._n_gpu_layers = -1  # -1 means offload all layers to GPU
         self._llama = Llama(
@@ -95,3 +100,46 @@ class LlamaCppBackend(LLMBackend):
         if self._llama is None:
             raise RuntimeError("Model not loaded. Call load() first.")
         return self._llama.n_ctx()
+
+    @contextlib.contextmanager
+    def serve_openai(self, port: int, n_ctx: int = 8192):
+        if self._llama is None:
+            raise RuntimeError("Model not loaded. Call load() first.")
+
+        model_path = self._model_path
+        model_id = self._model_id
+        self.unload()
+        proc = subprocess.Popen(
+            [
+                "python3",
+                "-m",
+                "llama_cpp.server",
+                "--model",
+                model_path,
+                "--n_gpu_layers",
+                "-1",
+                "--n_ctx",
+                str(n_ctx),
+                "--port",
+                str(port),
+            ],
+        )
+
+        deadline = time.time() + 30
+        while time.time() < deadline:
+            try:
+                urllib.request.urlopen(f"http://localhost:{port}/v1/models", timeout=1)
+                break
+            except Exception:
+                time.sleep(0.5)
+        else:
+            proc.terminate()
+            proc.wait(timeout=10)
+            raise TimeoutError(f"Server on port {port} did not become healthy within 30s")
+
+        try:
+            yield
+        finally:
+            proc.terminate()
+            proc.wait(timeout=10)
+            self.load(model_id)
