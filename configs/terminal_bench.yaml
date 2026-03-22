@@ -4,6 +4,9 @@ defaults:
   runs_per_test: 1        # each call triggers a full Harbor job — don't repeat
   keep_model_files: true
 
+# TODO: scored 0% with this model — terminus-2 requires JSON tool-call output
+# which Qwen2.5-Coder-14B does not reliably produce. Verify with a model that
+# natively supports structured tool calls (e.g. a function-calling fine-tune).
 models:
   - bartowski/Qwen2.5-Coder-14B-Instruct-GGUF:Q4_K_M
 
