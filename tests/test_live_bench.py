@@ -1,5 +1,8 @@
+import contextlib
 import logging
-from unittest.mock import patch
+import socket
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -217,3 +220,116 @@ def test_no_questions_after_filter_raises(tmp_path):
     with patch.object(bench, "_load_questions", return_value=[]):
         with pytest.raises(ValueError, match="No questions"):
             bench._get_filtered_questions()
+
+
+# ─── run_single ───────────────────────────────────────────────────────────────
+
+
+def _make_mock_backend():
+    backend = MagicMock()
+    backend.serve_openai.return_value = contextlib.nullcontext()
+    return backend
+
+
+def _write_judgment_files(run_dir: Path, judgments_by_category: dict):
+    """Write mock ground_truth_judgment.jsonl files under run_dir/data/."""
+    import json
+
+    for category, scores in judgments_by_category.items():
+        task_dir = run_dir / "data" / f"live_bench/{category}/test_task" / "model_judgment"
+        task_dir.mkdir(parents=True, exist_ok=True)
+        jfile = task_dir / "ground_truth_judgment.jsonl"
+        with jfile.open("w") as f:
+            for i, score in enumerate(scores):
+                f.write(
+                    json.dumps(
+                        {
+                            "question_id": f"q{i}",
+                            "category": category,
+                            "task": f"live_bench/{category}/test_task",
+                            "model": "local",
+                            "score": score,
+                        }
+                    )
+                    + "\n"
+                )
+
+
+def test_run_single_score_computation(tmp_path):
+    pre_filtered = [
+        {"question_id": "q0", "category": "coding", "turns": ["q"]},
+        {"question_id": "q1", "category": "coding", "turns": ["q"]},
+        {"question_id": "q2", "category": "math", "turns": ["q"]},
+        {"question_id": "q3", "category": "math", "turns": ["q"]},
+    ]
+    bench = LiveBenchBenchmark(_valid_config(jobs_dir=str(tmp_path)))
+
+    def fake_gen_judgments(*args, **kwargs):
+        _write_judgment_files(
+            Path.cwd(),
+            {
+                "coding": [1.0, 0.0],  # mean = 0.5
+                "math": [1.0, 1.0],  # mean = 1.0
+            },
+        )
+
+    with (
+        patch.object(bench, "_get_filtered_questions", return_value=pre_filtered),
+        patch("livebench.gen_api_answer.run_questions", MagicMock()),
+        patch("livebench.gen_ground_truth_judgment.gen_judgments", fake_gen_judgments),
+        patch.object(bench, "_load_model_answers", return_value={}),
+    ):
+        result, gen = bench.run_single(_make_mock_backend())
+
+    # overall = mean([0.5, 1.0]) = 0.75
+    assert abs(result.score - 0.75) < 0.001
+    assert result.extra["per_category_scores"]["coding"] == pytest.approx(0.5)
+    assert result.extra["per_category_scores"]["math"] == pytest.approx(1.0)
+    assert gen.text == ""
+    assert gen.prompt_tokens == 0
+
+
+def test_run_single_score_all_pass(tmp_path):
+    pre_filtered = [{"question_id": "q0", "category": "coding", "turns": ["q"]}]
+    bench = LiveBenchBenchmark(_valid_config(jobs_dir=str(tmp_path)))
+
+    def fake_gen_judgments(*args, **kwargs):
+        _write_judgment_files(Path.cwd(), {"coding": [1.0]})
+
+    with (
+        patch.object(bench, "_get_filtered_questions", return_value=pre_filtered),
+        patch("livebench.gen_api_answer.run_questions", MagicMock()),
+        patch("livebench.gen_ground_truth_judgment.gen_judgments", fake_gen_judgments),
+        patch.object(bench, "_load_model_answers", return_value={}),
+    ):
+        result, _ = bench.run_single(_make_mock_backend())
+
+    assert abs(result.score - 1.0) < 0.001
+
+
+def test_run_single_score_none_pass(tmp_path):
+    pre_filtered = [{"question_id": "q0", "category": "coding", "turns": ["q"]}]
+    bench = LiveBenchBenchmark(_valid_config(jobs_dir=str(tmp_path)))
+
+    def fake_gen_judgments(*args, **kwargs):
+        _write_judgment_files(Path.cwd(), {"coding": [0.0]})
+
+    with (
+        patch.object(bench, "_get_filtered_questions", return_value=pre_filtered),
+        patch("livebench.gen_api_answer.run_questions", MagicMock()),
+        patch("livebench.gen_ground_truth_judgment.gen_judgments", fake_gen_judgments),
+        patch.object(bench, "_load_model_answers", return_value={}),
+    ):
+        result, _ = bench.run_single(_make_mock_backend())
+
+    assert abs(result.score - 0.0) < 0.001
+
+
+def test_run_single_port_in_use(tmp_path):
+    bench = LiveBenchBenchmark(_valid_config(jobs_dir=str(tmp_path), port=19001))
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(("127.0.0.1", 19001))
+        with patch.object(bench, "_get_filtered_questions", return_value=[MagicMock()]):
+            with pytest.raises(RuntimeError, match="already in use"):
+                bench.run_single(_make_mock_backend())
