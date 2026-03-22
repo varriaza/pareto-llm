@@ -173,25 +173,27 @@ class LiveBenchBenchmark(Benchmark):
         return all_questions
 
     def _load_model_answers(self, run_dir: Path) -> dict:
-        """Load model answer JSONL files written by run_questions() (internal seam for testing)."""
-        from livebench.common import load_model_answers
+        """Load model answer JSONL files written by run_questions() (internal seam for testing).
 
-        # run_questions() writes to data/ relative to CWD (run_dir)
-        answer_dir = str(run_dir / "data")
-        if not os.path.isdir(answer_dir):
-            return {}
-        # Glob for any model_answer directories
-        all_answers: dict = {}
-        for jsonl_file in Path(answer_dir).glob("**/model_answer/*.jsonl"):
-            partial = load_model_answers(
-                answer_dir=str(jsonl_file),
-                models=["local"],
-            )
-            for model, answers in partial.items():
-                if model not in all_answers:
-                    all_answers[model] = {}
-                all_answers[model].update(answers)
-        return all_answers
+        Reads JSONL files directly instead of calling livebench.common.load_model_answers()
+        because that function requires a model_configs/ directory not present in the installed package.
+        Returns {model_name: {question_id: answer_dict}} matching the format gen_judgments() expects.
+        """
+        answers: dict[str, dict] = {}
+        for jsonl_file in (run_dir / "data").rglob("model_answer/*.jsonl"):
+            model_name = jsonl_file.stem  # e.g. "local"
+            if model_name not in answers:
+                answers[model_name] = {}
+            with jsonl_file.open() as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    entry = json.loads(line)
+                    qid = entry.get("question_id")
+                    if qid is not None:
+                        answers[model_name][qid] = entry
+        return answers
 
     def run_single(self, backend: LLMBackend) -> tuple[BenchmarkResult, GenerationResult]:
         from livebench.gen_api_answer import run_questions
@@ -274,7 +276,6 @@ class LiveBenchBenchmark(Benchmark):
         # Aggregate scores from judgment JSONL files
         per_category_scores: dict[str, float] = {}
         per_category_counts: dict[str, int] = {}
-        all_scores: list[float] = []
 
         for jfile in run_dir.glob("**/ground_truth_judgment.jsonl"):
             with jfile.open() as f:
@@ -287,7 +288,6 @@ class LiveBenchBenchmark(Benchmark):
                     if score < 0:  # -1 marks invalid/missing scores
                         continue
                     cat = entry.get("category", "unknown")
-                    all_scores.append(score)
                     per_category_scores.setdefault(cat, 0.0)
                     per_category_counts.setdefault(cat, 0)
                     per_category_scores[cat] += score
@@ -296,7 +296,7 @@ class LiveBenchBenchmark(Benchmark):
         for cat in per_category_scores:
             per_category_scores[cat] /= per_category_counts[cat]
 
-        overall = sum(all_scores) / len(all_scores) if all_scores else 0.0
+        overall = sum(per_category_scores.values()) / len(per_category_scores) if per_category_scores else 0.0
 
         return (
             BenchmarkResult(
