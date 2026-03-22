@@ -4,12 +4,27 @@ from __future__ import annotations
 
 import importlib.util
 import logging
+import random
 import re
+from collections import defaultdict
 
 from pareto_llm.backend.base import GenerationResult, LLMBackend
 from pareto_llm.benchmarks.base import Benchmark, BenchmarkResult, register
 
 _logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Verified against livebench installed in this repo:
+#
+#   _AGENTIC_FIELD — agentic questions have category == "agentic_coding"
+#   (confirmed in livebench/gen_api_answer.py:
+#    `[q for q in questions if q.get('category') == 'agentic_coding']`)
+#
+#   Question loading uses get_categories_tasks() + load_questions() from
+#   livebench.common. load_questions() takes a HF Dataset as first arg, not
+#   a bench_name string — so _load_questions() calls get_categories_tasks().
+# ─────────────────────────────────────────────────────────────────────────────
+_AGENTIC_FIELD = ("category", "agentic_coding")  # (field_name, value_to_skip)
 
 VALID_CATEGORIES = frozenset(
     {
@@ -82,8 +97,75 @@ class LiveBenchBenchmark(Benchmark):
         if importlib.util.find_spec("livebench") is None:
             raise RuntimeError("livebench package not found. Install with: uv pip install 'pareto-llm[live-bench]'")
 
+    def _load_questions(self) -> list[dict]:
+        """Load all LiveBench questions from HuggingFace (internal, testable seam)."""
+        from livebench.common import get_categories_tasks, load_questions
+
+        release_date = self.config["release_date"]
+        release_opt = None if release_date == "latest" else release_date
+
+        categories, _tasks = get_categories_tasks("live_bench")
+        all_questions: list[dict] = []
+        for category_name, dataset in categories.items():
+            qs = load_questions(
+                dataset,
+                livebench_release=release_opt,
+            )
+            # Attach category name so filtering works consistently
+            for q in qs:
+                if "category" not in q:
+                    q["category"] = category_name
+            all_questions.extend(qs)
+        return all_questions
+
     def _get_filtered_questions(self) -> list[dict]:
-        raise NotImplementedError
+        all_questions = self._load_questions()
+
+        # Filter by category
+        cats = self.config["categories"]
+        if cats != "all":
+            cat_set = set(cats)
+            all_questions = [q for q in all_questions if q.get("category") in cat_set]
+
+        # Filter agentic questions
+        if self.config["skip_agentic"]:
+            field, skip_val = _AGENTIC_FIELD
+            all_questions = [q for q in all_questions if q.get(field) != skip_val]
+
+        # Subsample per category
+        sample_size = self.config["sample_size"]
+        per_cat = self.config["sample_size_per_category"]
+        seed = self.config["seed"]
+
+        if sample_size is not None or per_cat:
+            by_cat: dict[str, list[dict]] = defaultdict(list)
+            for q in all_questions:
+                by_cat[q["category"]].append(q)
+
+            sampled: list[dict] = []
+            rng = random.Random(seed)
+            for cat, qs in by_cat.items():
+                limit = per_cat.get(cat, sample_size)
+                if limit is not None:
+                    if limit > len(qs):
+                        _logger.warning(
+                            "sample_size=%d exceeds available questions (%d) for category %r; using all",
+                            limit,
+                            len(qs),
+                            cat,
+                        )
+                    else:
+                        qs = rng.sample(qs, limit)
+                sampled.extend(qs)
+            all_questions = sampled
+
+        if not all_questions:
+            raise ValueError(
+                f"No questions found for categories={self.config['categories']!r} "
+                f"and release_date={self.config['release_date']!r}"
+            )
+
+        return all_questions
 
     def run_single(self, backend: LLMBackend) -> tuple[BenchmarkResult, GenerationResult]:
         raise NotImplementedError
