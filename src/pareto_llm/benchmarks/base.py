@@ -10,11 +10,13 @@ BENCHMARK_REGISTRY: dict[str, type["Benchmark"]] = {}
 
 def register(key: str):
     """Class decorator: register a Benchmark subclass under the given key."""
+
     def decorator(cls: type["Benchmark"]) -> type["Benchmark"]:
         if key in BENCHMARK_REGISTRY:
             raise KeyError(f"Benchmark key '{key}' is already registered.")
         BENCHMARK_REGISTRY[key] = cls
         return cls
+
     return decorator
 
 
@@ -31,6 +33,4 @@ class Benchmark(ABC):
         self.config = config
 
     @abstractmethod
-    def run_single(
-        self, backend: "LLMBackend"
-    ) -> "tuple[BenchmarkResult, GenerationResult]": ...
+    def run_single(self, backend: "LLMBackend") -> "tuple[BenchmarkResult, GenerationResult]": ...

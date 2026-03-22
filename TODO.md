@@ -2,11 +2,12 @@
 - [x] Verify RESULTS.md changes
 - [x] Make a mermaid diagram of files in this repo that shows at a high level what the file does and how it connects to other files
   - [x] Make sure this file is perpetually updated with each code push
-- [ ] Merge PR
+- [x] Merge PR
 - [ ] Terminal bench (coding and CLI test)
-  - [ ] Create plan for implementing Terminal Bench (hard version)
-    - [ ] See https://harborframework.com/docs/tutorials/running-terminal-bench
-  - [ ] Implement Terminal bench (Hard version)
+  - [x] Create plan for implementing Terminal Bench (hard version)
+    - [x] See https://harborframework.com/docs/tutorials/running-terminal-bench
+  - [x] Implement Terminal bench (Hard version)
+  - [ ] Find a local model that actually passes the easy questions
   - [ ] Update setup script to install terminal bench
 - [ ] Tau squared also called τ^2 or tau2 (tool calling tests)
   - [ ] Create plan for implementing tau Airline benchmark

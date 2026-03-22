@@ -1,0 +1,34 @@
+run_label: live_bench_run
+
+defaults:
+  runs_per_test: 1        # each call triggers a full LiveBench job — don't repeat
+  keep_model_files: true
+
+# TODO: verify this model produces correctly-formatted responses for LiveBench.
+# LiveBench uses standard chat completions; most instruction-following models work.
+models:
+  - bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
+
+benchmarks:
+  - type: live_bench
+    name: livebench_coding_sample
+    config:
+      port: 8766
+      # Available categories:
+      #   - coding
+      #   - math
+      #   - reasoning
+      #   - language
+      #   - data_analysis
+      #   - instruction_following
+      # Use the string "all" to run every category, or a list to select specific ones.
+      # NOTE: "all" must be a plain string, not a list — categories: "all" works, categories: ["all"] does not.
+      # categories: ["coding", "math"]
+      categories: "all"
+      release_date: "latest"
+      sample_size: 5          # small sample for quick testing
+      seed: 42
+      skip_agentic: true      # set false to include Docker-based agentic coding tasks
+      n_ctx: 8192
+      parallel: 4
+      jobs_dir: ./results/livebench

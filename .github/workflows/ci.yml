@@ -17,7 +17,7 @@ jobs:
         uses: astral-sh/setup-uv@v4
 
       - name: Install dependencies
-        run: uv sync --extra dev --extra terminal-bench
+        run: uv sync --extra dev --extra terminal-bench --extra live-bench
 
       - name: Run tests (excluding mlx and cuda)
         run: uv run pytest -m "not mlx and not cuda" --cov=src/pareto_llm --cov-report=term-missing -v

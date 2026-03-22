@@ -24,7 +24,7 @@ def test_gpu_fields_none_when_no_backend():
 def test_gpu_fields_populated_for_mlx():
     """Mock mlx.core.metal so we can test without Apple Silicon."""
     mock_metal = MagicMock()
-    mock_metal.get_active_memory.return_value = 2 * 1024 ** 3  # 2 GiB in bytes
+    mock_metal.get_active_memory.return_value = 2 * 1024**3  # 2 GiB in bytes
 
     with patch.dict(
         "sys.modules",
@@ -41,7 +41,7 @@ def test_gpu_fields_populated_for_cuda():
     """Mock pynvml so we can test without an NVIDIA GPU."""
     mock_pynvml = MagicMock()
     mem_info = MagicMock()
-    mem_info.used = 4 * 1024 ** 3  # 4 GiB
+    mem_info.used = 4 * 1024**3  # 4 GiB
     mock_pynvml.nvmlDeviceGetMemoryInfo.return_value = mem_info
 
     with patch.dict("sys.modules", {"pynvml": mock_pynvml}):

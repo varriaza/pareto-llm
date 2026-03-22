@@ -1,4 +1,5 @@
 """Background-thread system metrics collector: RAM and optional GPU memory."""
+
 from __future__ import annotations
 
 import threading
@@ -44,10 +45,12 @@ class SystemMetricsCollector:
     def _build_gpu_sampler(self) -> Any:
         if self._gpu_backend == "mlx":
             import importlib
+
             metal = importlib.import_module("mlx.core.metal")  # type: ignore[import]
             return lambda: metal.get_active_memory()
         if self._gpu_backend == "cuda":
             import pynvml  # type: ignore[import]
+
             pynvml.nvmlInit()
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             return lambda: pynvml.nvmlDeviceGetMemoryInfo(handle).used
