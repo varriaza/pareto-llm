@@ -43,9 +43,6 @@ class TerminalBenchmark(Benchmark):
         merged = {**self.DEFAULTS, **config}
         super().__init__(merged)
 
-        if importlib.util.find_spec("harbor") is None:
-            raise RuntimeError("harbor package not found. Install with: uv tool install harbor or pip install harbor")
-
         invalid = set(self.config["difficulties"]) - self.VALID_DIFFICULTIES
         if invalid:
             raise ValueError(
@@ -59,6 +56,9 @@ class TerminalBenchmark(Benchmark):
         sample_size = self.config["sample_size"]
         if sample_size is not None and sample_size <= 0:
             raise ValueError(f"sample_size must be > 0, got {sample_size}")
+
+        if importlib.util.find_spec("harbor") is None:
+            raise RuntimeError("harbor package not found. Install with: uv tool install harbor or pip install harbor")
 
     @staticmethod
     def _fetch_difficulty(task_ref) -> str:
