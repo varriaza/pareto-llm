@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "pareto-llm"
 version = "0.1.0"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "click>=8.1",
     "pydantic>=2.0",
@@ -24,6 +24,7 @@ cuda = [
     "llama-cpp-python>=0.2",
     "nvidia-ml-py>=12.0",
     "uvicorn>=0.20",
+    "starlette-context>=0.3",
 ]
 dev = [
     "pytest>=8.0",
@@ -36,6 +37,8 @@ terminal-bench = [
 ]
 live-bench = [
     "livebench @ git+https://github.com/livebench/livebench.git@18b524d2d3a32282300b3548ef69e7d904ece836",
+    "setuptools<71",  # livebench's syllapy dependency uses pkg_resources, removed in setuptools 71
+    "en_core_web_sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",  # livebench's instruction_following scorer
 ]
 
 [project.scripts]
@@ -46,6 +49,16 @@ packages = ["src/pareto_llm"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[[tool.uv.index]]
+name = "llama-cpp-python-cuda"
+url = "https://abetlen.github.io/llama-cpp-python/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+llama-cpp-python = [
+    { index = "llama-cpp-python-cuda", extra = "cuda" },
+]
 
 [tool.ruff]
 line-length = 120

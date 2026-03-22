@@ -9,6 +9,7 @@ import os
 import random
 import re
 import socket
+import time
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -102,6 +103,11 @@ class LiveBenchBenchmark(Benchmark):
         if importlib.util.find_spec("livebench") is None:
             raise RuntimeError("livebench package not found. Install with: uv pip install 'pareto-llm[live-bench]'")
 
+    # Oldest release whose instruction_following questions use the new IFBench format.
+    # gen_judgments calls set() on question dicts for older questions, which crashes
+    # because dicts are unhashable. Upstream bug: livebench/gen_ground_truth_judgment.py:439
+    _MIN_IF_RELEASE = "2025-11-25"
+
     def _load_questions(self) -> list[dict]:
         """Load all LiveBench questions from HuggingFace (internal, testable seam)."""
         from livebench.common import get_categories_tasks, load_questions
@@ -121,6 +127,27 @@ class LiveBenchBenchmark(Benchmark):
                 if "category" not in q:
                     q["category"] = category_name
             all_questions.extend(qs)
+
+        # Drop old-format instruction_following questions — they trigger an upstream bug
+        # in gen_judgments (set() on unhashable dicts) for release_date < _MIN_IF_RELEASE.
+        before = len(all_questions)
+        all_questions = [
+            q
+            for q in all_questions
+            if not (
+                q.get("category") == "instruction_following"
+                and q.get("livebench_release_date", "") < self._MIN_IF_RELEASE
+            )
+        ]
+        skipped = before - len(all_questions)
+        if skipped:
+            _logger.warning(
+                "Skipped %d old-format instruction_following questions "
+                "(livebench_release_date < %s) due to upstream bug in gen_judgments.",
+                skipped,
+                self._MIN_IF_RELEASE,
+            )
+
         return all_questions
 
     def _get_filtered_questions(self) -> list[dict]:
@@ -214,7 +241,7 @@ class LiveBenchBenchmark(Benchmark):
         # Timestamped run directory — LiveBench writes files relative to CWD,
         # so we chdir here and restore in the finally block.
         run_name = f"lbench_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
-        run_dir = Path(self.config["jobs_dir"]) / run_name
+        run_dir = (Path(self.config["jobs_dir"]) / run_name).resolve()
         run_dir.mkdir(parents=True, exist_ok=True)
 
         # LiteLLM requires OPENAI_API_KEY even for local servers
@@ -239,10 +266,13 @@ class LiveBenchBenchmark(Benchmark):
         answer_file = str(run_dir / "data" / "live_bench" / "model_answer" / "local.jsonl")
 
         orig_cwd = Path.cwd()
+        _saved_key = None
+        elapsed = 0.0
         try:
             os.chdir(run_dir)
 
             with backend.serve_openai(port, n_ctx=self.config["n_ctx"]):
+                t0 = time.perf_counter()
                 run_questions(
                     parallel=self.config["parallel"],
                     questions=questions,
@@ -256,14 +286,28 @@ class LiveBenchBenchmark(Benchmark):
                     model_display_name_override="local",
                     api_dict=api_dict,
                 )
+                elapsed = time.perf_counter() - t0
 
-            # Scoring is offline — load answers and judge
+            # Scoring is offline — load answers and judge.
+            # Unset OPENAI_API_KEY so AMPS_Hard scorer doesn't try to call the real
+            # OpenAI API (it was set to "local" just to satisfy LiteLLM above).
+            _saved_key = os.environ.pop("OPENAI_API_KEY", None)
             model_answers = self._load_model_answers(run_dir)
 
+            # Sum output tokens across all answers; prompt tokens are not available
+            # from the OpenAI-compatible server responses.
+            total_gen_tokens = sum(
+                answer.get("total_output_tokens", 0)
+                for answers_by_qid in model_answers.values()
+                for answer in answers_by_qid.values()
+            )
+
+            # Write judgment JSONL relative to run_dir (our CWD at this point)
+            judgment_file = "data/live_bench/model_judgment/ground_truth_judgment.jsonl"
             gen_judgments(
                 parallel=self.config["parallel"],
                 questions=questions,
-                output_file=None,
+                output_file=judgment_file,
                 model_answers=model_answers,
                 model_list=["local"],
                 remove_existing_file=False,
@@ -272,6 +316,8 @@ class LiveBenchBenchmark(Benchmark):
 
         finally:
             os.chdir(orig_cwd)
+            if _saved_key is not None:
+                os.environ["OPENAI_API_KEY"] = _saved_key
 
         # Aggregate scores from judgment JSONL files
         per_category_scores: dict[str, float] = {}
@@ -312,5 +358,11 @@ class LiveBenchBenchmark(Benchmark):
                     "run_name": run_name,
                 },
             ),
-            GenerationResult(text="", prompt_tokens=0, gen_tokens=0, prompt_tps=0.0, gen_tps=0.0),
+            GenerationResult(
+                text="",
+                prompt_tokens=0,
+                gen_tokens=total_gen_tokens,
+                prompt_tps=0.0,
+                gen_tps=total_gen_tokens / elapsed if elapsed > 0 else 0.0,
+            ),
         )

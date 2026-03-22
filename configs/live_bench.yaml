@@ -14,9 +14,17 @@ benchmarks:
     name: livebench_coding_sample
     config:
       port: 8766
-      # Available categories: coding, math, reasoning, language, data_analysis, instruction_following
-      # Use "all" to run every category, or a list to select specific ones.
-      categories: ["coding"]
+      # Available categories:
+      #   - coding
+      #   - math
+      #   - reasoning
+      #   - language
+      #   - data_analysis
+      #   - instruction_following
+      # Use the string "all" to run every category, or a list to select specific ones.
+      # NOTE: "all" must be a plain string, not a list — categories: "all" works, categories: ["all"] does not.
+      # categories: ["coding", "math"]
+      categories: "all"
       release_date: "latest"
       sample_size: 5          # small sample for quick testing
       seed: 42

@@ -123,6 +123,8 @@ class LlamaCppBackend(LLMBackend):
                 "--port",
                 str(port),
             ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
 
         deadline = time.time() + 30

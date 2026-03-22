@@ -21,6 +21,10 @@ def cli(verbose: bool) -> None:
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
+    if not verbose:
+        # Suppress chatty third-party loggers that add no signal at normal verbosity
+        for noisy in ("httpx", "httpcore", "huggingface_hub", "uvicorn", "uvicorn.access"):
+            logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 @cli.command()

@@ -1,12 +1,22 @@
 import contextlib
 import logging
+import os
 import socket
+import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
-from pareto_llm.benchmarks.live_bench import LiveBenchBenchmark
+# Python 3.12 changed unittest.mock.patch to use pkgutil.resolve_name, which requires
+# the target module to already exist in sys.modules. Pre-register lightweight stubs so
+# patch() can find the modules without triggering livebench's heavyweight imports
+# (e.g. spaCy model downloads at import time).
+for _mod in ("livebench.gen_api_answer", "livebench.gen_ground_truth_judgment"):
+    if _mod not in sys.modules:
+        sys.modules[_mod] = MagicMock()
+
+from pareto_llm.benchmarks.live_bench import LiveBenchBenchmark  # noqa: E402
 
 
 def _valid_config(**overrides):
@@ -319,6 +329,66 @@ def test_run_single_score_none_pass(tmp_path):
         result, _ = bench.run_single(_make_mock_backend())
 
     assert abs(result.score - 0.0) < 0.001
+
+
+def test_run_single_gen_tokens_and_tps(tmp_path):
+    pre_filtered = [{"question_id": "q0", "category": "coding", "turns": ["q"]}]
+    bench = LiveBenchBenchmark(_valid_config(jobs_dir=str(tmp_path)))
+
+    fake_answers = {
+        "local": {
+            "q0": {"total_output_tokens": 42},
+            "q1": {"total_output_tokens": 58},
+        }
+    }
+
+    def fake_gen_judgments(*args, **kwargs):
+        _write_judgment_files(Path.cwd(), {"coding": [1.0]})
+
+    with (
+        patch.object(bench, "_get_filtered_questions", return_value=pre_filtered),
+        patch("livebench.gen_api_answer.run_questions", MagicMock()),
+        patch("livebench.gen_ground_truth_judgment.gen_judgments", fake_gen_judgments),
+        patch.object(bench, "_load_model_answers", return_value=fake_answers),
+    ):
+        _, gen = bench.run_single(_make_mock_backend())
+
+    assert gen.gen_tokens == 100  # 42 + 58
+    assert gen.gen_tps > 0  # wall-clock TPS: 100 tokens / elapsed seconds
+
+
+def test_run_single_openai_key_unset_during_scoring(tmp_path, monkeypatch):
+    """OPENAI_API_KEY must not be set during gen_judgments.
+
+    AMPS_Hard math questions call is_equiv_llm() whenever OPENAI_API_KEY is present,
+    which tries to reach OpenAI's real API. With a local/fake key this crashes the
+    entire scoring pass.
+    """
+    monkeypatch.setenv("OPENAI_API_KEY", "fake-key-for-test")
+
+    pre_filtered = [{"question_id": "q0", "category": "coding", "turns": ["q"]}]
+    bench = LiveBenchBenchmark(_valid_config(jobs_dir=str(tmp_path)))
+
+    key_during_scoring: list[str | None] = []
+
+    def fake_gen_judgments(*args, **kwargs):
+        key_during_scoring.append(os.environ.get("OPENAI_API_KEY"))
+        _write_judgment_files(Path.cwd(), {"coding": [1.0]})
+
+    with (
+        patch.object(bench, "_get_filtered_questions", return_value=pre_filtered),
+        patch("livebench.gen_api_answer.run_questions", MagicMock()),
+        patch("livebench.gen_ground_truth_judgment.gen_judgments", fake_gen_judgments),
+        patch.object(bench, "_load_model_answers", return_value={}),
+    ):
+        bench.run_single(_make_mock_backend())
+
+    assert key_during_scoring == [None], (
+        "OPENAI_API_KEY must be unset during gen_judgments — if present, AMPS_Hard "
+        "scorer calls the real OpenAI API with whatever key is set"
+    )
+    # Key must be restored after run_single completes
+    assert os.environ.get("OPENAI_API_KEY") == "fake-key-for-test"
 
 
 def test_run_single_port_in_use(tmp_path):
