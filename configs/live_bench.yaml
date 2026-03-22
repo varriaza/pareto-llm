@@ -4,8 +4,6 @@ defaults:
   runs_per_test: 1        # each call triggers a full LiveBench job — don't repeat
   keep_model_files: true
 
-# TODO: verify this model produces correctly-formatted responses for LiveBench.
-# LiveBench uses standard chat completions; most instruction-following models work.
 models:
   - bartowski/Qwen2.5-7B-Instruct-GGUF:Q4_K_M
 

@@ -1,13 +1,51 @@
 import contextlib
+import importlib.util
 import logging
 import math
 import pathlib
 import socket
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from pareto_llm.benchmarks.terminal_bench import TerminalBenchmark
+
+# Checked before the autouse fixture patches find_spec — some tests need harbor's
+# real data classes (TaskConfig, JobConfig) and must be skipped without it.
+_HARBOR_AVAILABLE = importlib.util.find_spec("harbor") is not None
+requires_harbor = pytest.mark.skipif(not _HARBOR_AVAILABLE, reason="harbor not installed")
+
+
+@pytest.fixture(autouse=True)
+def _mock_harbor_installed(monkeypatch):
+    """Pretend harbor is installed for all tests in this module.
+
+    - Patches importlib.util.find_spec so __init__ doesn't raise RuntimeError.
+    - Pre-registers harbor submodules in sys.modules so lazy imports inside
+      run_single resolve without harbor actually being installed.
+    """
+    _orig = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name: MagicMock() if name == "harbor" else _orig(name),
+    )
+    for _mod in (
+        "harbor",
+        "harbor.models",
+        "harbor.models.registry",
+        "harbor.models.trial",
+        "harbor.models.trial.config",
+        "harbor.models.job",
+        "harbor.models.job.config",
+        "harbor.models.job.result",
+        "harbor.registry",
+        "harbor.registry.client",
+        "harbor.job",
+    ):
+        if _mod not in sys.modules:
+            monkeypatch.setitem(sys.modules, _mod, MagicMock())
 
 
 def _valid_config(**overrides):
@@ -105,6 +143,7 @@ _PATCH_FETCH = patch(
 )
 
 
+@requires_harbor
 def test_filtering_selects_correct_difficulties(tmp_path):
     easy_dir = _write_task_toml(tmp_path, "easy", "easy")
     medium_dir = _write_task_toml(tmp_path, "medium", "medium")
@@ -228,6 +267,7 @@ def _setup_run_mocks(tmp_path, reward_stats):
     return bench, backend, pre_filtered, make_job, mock_job_result
 
 
+@requires_harbor
 def test_run_single_score_three_of_four(tmp_path):
     bench, backend, pre_filtered, make_job, mock_job_result = _setup_run_mocks(
         tmp_path, {"reward": {1.0: ["t1", "t2", "t3"], 0.0: ["t4"]}}
@@ -248,6 +288,7 @@ def test_run_single_score_three_of_four(tmp_path):
     assert gen.gen_tokens == 0
 
 
+@requires_harbor
 def test_run_single_score_all_pass(tmp_path):
     bench, backend, pre_filtered, make_job, mock_job_result = _setup_run_mocks(
         tmp_path, {"reward": {1.0: ["t1", "t2"]}}
@@ -263,6 +304,7 @@ def test_run_single_score_all_pass(tmp_path):
     assert math.isclose(result.score, 1.0)
 
 
+@requires_harbor
 def test_run_single_score_none_pass(tmp_path):
     bench, backend, pre_filtered, make_job, mock_job_result = _setup_run_mocks(
         tmp_path, {"reward": {0.0: ["t1", "t2"]}}

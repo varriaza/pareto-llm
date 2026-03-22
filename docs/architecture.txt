@@ -56,15 +56,27 @@ Pareto LLM — Repository Architecture
 ║  │Apple│ ║  ║       ║  ║  │prompt   │ ║
 ║  │Metal│ ║  ║       ║  ║  │fill_    │ ║
 ║  ├─────┤ ║  ║       ║  ║  │ratio    │ ║
-║  │llama│ ║  ║       ║  ║  └─────────┘ ║
-║  │cpp  │ ║  ║       ║  ║              ║
-║  │back │ ║  ║       ║  ║ __init__.py  ║
-║  │end  │ ║  ║       ║  ║ (triggers    ║
-║  │     │ ║  ║       ║  ║ @register    ║
-║  │NVDIA│ ║  ║       ║  ║ side-effect) ║
-║  │CUDA │ ║  ║       ║  ╚══════════════╝
-║  └─────┘ ║  ╚═══════╝
-╚══════════╝
+║  │llama│ ║  ║       ║  ║  ├─────────┤ ║
+║  │cpp  │ ║  ║       ║  ║  │live_    │ ║
+║  │back │ ║  ║       ║  ║  │bench.py │ ║
+║  │end  │ ║  ║       ║  ║  │         │ ║
+║  │     │ ║  ║       ║  ║  │LiveBench│ ║
+║  │NVDIA│ ║  ║       ║  ║  │via OAI  │ ║
+║  │CUDA │ ║  ║       ║  ║  │server   │ ║
+║  └─────┘ ║  ╚═══════╝  ║  ├─────────┤ ║
+╚══════════╝             ║  │terminal_│ ║
+                         ║  │bench.py │ ║
+                         ║  │         │ ║
+                         ║  │Harbor/  │ ║
+                         ║  │Docker   │ ║
+                         ║  │tool-use │ ║
+                         ║  └─────────┘ ║
+                         ║              ║
+                         ║ __init__.py  ║
+                         ║ (triggers    ║
+                         ║ @register    ║
+                         ║ side-effect) ║
+                         ╚══════════════╝
 
 ╔══════════════════════════════════════════════════════════════════════════════╗
 ║  TESTS                                                                       ║
@@ -81,4 +93,8 @@ Pareto LLM — Repository Architecture
 ║  test_mlx_backend.py                   test_llamacpp_backend.py             ║
 ║  Real MLX tests (@pytest.mark.mlx)     Real llama.cpp tests                 ║
 ║                                        (@pytest.mark.cuda)                  ║
+║                                                                              ║
+║  test_live_bench.py                    test_terminal_bench.py               ║
+║  Config validation, filtering,         Config validation, run_single        ║
+║  sampling, run_single scoring          scoring, Harbor integration          ║
 ╚══════════════════════════════════════════════════════════════════════════════╝

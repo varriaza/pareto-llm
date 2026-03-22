@@ -37,8 +37,8 @@ class _PaddingBackend(LLMBackend):
     def max_context_tokens(self) -> int:
         return self._inner.max_context_tokens()
 
-    def serve_openai(self, port: int):
-        return self._inner.serve_openai(port)
+    def serve_openai(self, port: int, n_ctx: int = 8192):
+        return self._inner.serve_openai(port, n_ctx=n_ctx)
 
 
 @register("context_length")

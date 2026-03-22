@@ -1,4 +1,5 @@
 import contextlib
+import importlib.util
 import logging
 import os
 import socket
@@ -17,6 +18,35 @@ for _mod in ("livebench.gen_api_answer", "livebench.gen_ground_truth_judgment"):
         sys.modules[_mod] = MagicMock()
 
 from pareto_llm.benchmarks.live_bench import LiveBenchBenchmark  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _mock_livebench_installed(monkeypatch):
+    """Pretend livebench is installed for all tests in this module.
+
+    - Patches importlib.util.find_spec so __init__ doesn't raise RuntimeError.
+    - Pre-registers livebench submodules in sys.modules so lazy imports inside
+      run_single resolve without livebench actually being installed.
+
+    Tests that exercise the 'not installed' path override find_spec themselves;
+    their monkeypatch call takes precedence within that test's scope.
+    """
+    _orig = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name: MagicMock() if name == "livebench" else _orig(name),
+    )
+    for _mod in (
+        "livebench",
+        "livebench.common",
+        "livebench.gen_api_answer",
+        "livebench.gen_ground_truth_judgment",
+        "livebench.model",
+        "livebench.model.api_model_config",
+    ):
+        if _mod not in sys.modules:
+            monkeypatch.setitem(sys.modules, _mod, MagicMock())
 
 
 def _valid_config(**overrides):
