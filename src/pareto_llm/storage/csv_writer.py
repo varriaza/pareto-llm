@@ -1,4 +1,5 @@
 """Append-only CSV writer for benchmark results."""
+
 from __future__ import annotations
 
 import csv
@@ -61,12 +62,8 @@ class CsvWriter:
             "prompt_tps": gen_result.prompt_tps,
             "ram_max_gb": collector.ram_max_gb,
             "ram_avg_gb": collector.ram_avg_gb,
-            "gpu_ram_max_gb": collector.gpu_ram_max_gb
-                if collector.gpu_ram_max_gb is not None
-                else "",
-            "gpu_ram_avg_gb": collector.gpu_ram_avg_gb
-                if collector.gpu_ram_avg_gb is not None
-                else "",
+            "gpu_ram_max_gb": collector.gpu_ram_max_gb if collector.gpu_ram_max_gb is not None else "",
+            "gpu_ram_avg_gb": collector.gpu_ram_avg_gb if collector.gpu_ram_avg_gb is not None else "",
             "max_ctx_tokens": max_ctx_tokens,
             **extra_row,
         }
@@ -109,10 +106,7 @@ class CsvWriter:
 
     def _write_row(self, row: dict) -> None:
         # Detect any extra_* keys in this row that we haven't seen before
-        new_keys = [
-            k for k in row
-            if k.startswith("extra_") and k not in self._extra_keys
-        ]
+        new_keys = [k for k in row if k.startswith("extra_") and k not in self._extra_keys]
         for k in new_keys:
             self._extra_keys.append(k)
 
@@ -123,9 +117,7 @@ class CsvWriter:
             with self._path.open("r", newline="") as fh:
                 existing = list(csv.DictReader(fh))
             with self._path.open("w", newline="") as fh:
-                writer = csv.DictWriter(
-                    fh, fieldnames=self._fieldnames, extrasaction="ignore", restval=""
-                )
+                writer = csv.DictWriter(fh, fieldnames=self._fieldnames, extrasaction="ignore", restval="")
                 writer.writeheader()
                 for r in existing:
                     writer.writerow(r)
@@ -133,9 +125,7 @@ class CsvWriter:
         else:
             file_exists = self._path.exists()
             with self._path.open("a", newline="") as fh:
-                writer = csv.DictWriter(
-                    fh, fieldnames=self._fieldnames, extrasaction="ignore", restval=""
-                )
+                writer = csv.DictWriter(fh, fieldnames=self._fieldnames, extrasaction="ignore", restval="")
                 if not file_exists:
                     writer.writeheader()
                 writer.writerow(row)
