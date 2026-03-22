@@ -38,4 +38,8 @@ elif [ "${GPU_BACKEND}" = "mlx" ]; then
 fi
 
 echo ""
+echo "Optional: To install LiveBench extras (for the live_bench benchmark type):"
+echo "  uv pip install \"pareto-llm[live-bench]\""
+
+echo ""
 echo "Setup complete. Run 'pareto-llm --help' to get started."
