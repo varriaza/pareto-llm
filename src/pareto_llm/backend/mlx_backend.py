@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -78,7 +79,7 @@ class MLXBackend(LLMBackend):
         model_id = self._model_id
         self.unload()
         proc = subprocess.Popen(
-            ["python3", "-m", "mlx_lm.server", "--model", model_id, "--port", str(port)],
+            [sys.executable, "-m", "mlx_lm.server", "--model", model_id, "--port", str(port)],
         )
 
         deadline = time.time() + 30

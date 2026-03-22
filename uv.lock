@@ -2711,8 +2711,11 @@ dependencies = [
 
 [package.optional-dependencies]
 cuda = [
+    { name = "fastapi" },
     { name = "llama-cpp-python" },
     { name = "nvidia-ml-py" },
+    { name = "pydantic-settings" },
+    { name = "sse-starlette" },
     { name = "starlette-context" },
     { name = "uvicorn" },
 ]
@@ -2744,6 +2747,7 @@ dev = [
 requires-dist = [
     { name = "click", specifier = ">=8.1" },
     { name = "en-core-web-sm", marker = "extra == 'live-bench'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
+    { name = "fastapi", marker = "extra == 'cuda'", specifier = ">=0.100" },
     { name = "harbor", marker = "extra == 'terminal-bench'", specifier = ">=0.1" },
     { name = "huggingface-hub", specifier = ">=0.20" },
     { name = "livebench", marker = "extra == 'live-bench'", git = "https://github.com/livebench/livebench.git?rev=18b524d2d3a32282300b3548ef69e7d904ece836" },
@@ -2753,12 +2757,14 @@ requires-dist = [
     { name = "nvidia-ml-py", marker = "extra == 'cuda'", specifier = ">=12.0" },
     { name = "psutil", specifier = ">=5.9" },
     { name = "pydantic", specifier = ">=2.0" },
+    { name = "pydantic-settings", marker = "extra == 'cuda'", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5.0" },
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "pyyaml", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.4" },
     { name = "setuptools", marker = "extra == 'live-bench'", specifier = "<71" },
+    { name = "sse-starlette", marker = "extra == 'cuda'", specifier = ">=1.6" },
     { name = "starlette-context", marker = "extra == 'cuda'", specifier = ">=0.3" },
     { name = "uvicorn", marker = "extra == 'cuda'", specifier = ">=0.20" },
     { name = "uvicorn", marker = "extra == 'mlx'", specifier = ">=0.20" },

@@ -25,6 +25,9 @@ cuda = [
     "nvidia-ml-py>=12.0",
     "uvicorn>=0.20",
     "starlette-context>=0.3",
+    "fastapi>=0.100",
+    "sse-starlette>=1.6",
+    "pydantic-settings>=2.0",
 ]
 dev = [
     "pytest>=8.0",

@@ -18,6 +18,11 @@ def _detect_gpu_backend() -> str | None:
 
 
 if not os.environ.get("GPU_BACKEND"):
+    from dotenv import load_dotenv
+
+    load_dotenv(pathlib.Path(__file__).parent.parent / ".env")
+
+if not os.environ.get("GPU_BACKEND"):
     detected = _detect_gpu_backend()
     if detected:
         os.environ["GPU_BACKEND"] = detected

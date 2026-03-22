@@ -17,8 +17,3 @@
   - [ ] Create plan for implementing tau retail benchmark
     - [ ] See https://github.com/sierra-research/tau2-bench
   - [ ] Implement tau retail benchmark
-- [ ] Live bench (python coding tests)
-  - [ ] Create plan for implementing live bench python benchmark
-    - [ ] See https://github.com/livebench/livebench
-  - [ ] Implement live bench python benchmark
-  - [ ] Update setup script to install live bench

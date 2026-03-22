@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -111,7 +112,7 @@ class LlamaCppBackend(LLMBackend):
         self.unload()
         proc = subprocess.Popen(
             [
-                "python3",
+                sys.executable,
                 "-m",
                 "llama_cpp.server",
                 "--model",
