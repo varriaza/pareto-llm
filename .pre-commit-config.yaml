@@ -1,21 +1,28 @@
 repos:
   - repo: local
     hooks:
+      - id: no-commit-to-main
+        name: Prevent commits to main
+        entry: bash -c 'branch=$(git rev-parse --abbrev-ref HEAD); if [ "$branch" = "main" ]; then echo "Direct commits to main are not allowed. Please use a feature branch."; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: ruff-lint
         name: ruff lint
-        entry: uv run ruff check --fix
+        entry: bash -c 'PATH="$HOME/.local/bin:$PATH" uv run ruff check --fix'
         language: system
         types: [python]
 
       - id: ruff-format
         name: ruff format
-        entry: uv run ruff format
+        entry: bash -c 'PATH="$HOME/.local/bin:$PATH" uv run ruff format'
         language: system
         types: [python]
 
       - id: pytest
         name: pytest (unit tests)
-        entry: uv run pytest -m "not mlx and not cuda" -q
+        entry: bash -c 'PATH="$HOME/.local/bin:$PATH" uv run pytest -m "not mlx and not cuda" -q'
         language: system
         pass_filenames: false
         always_run: true
