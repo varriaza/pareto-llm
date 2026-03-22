@@ -44,6 +44,7 @@ class LiveBenchBenchmark(Benchmark):
 
     def __init__(self, config: dict) -> None:
         merged = {**self.DEFAULTS, **config}
+        merged["sample_size_per_category"] = dict(merged["sample_size_per_category"])
         super().__init__(merged)
 
         # Config validation first (before livebench import check)
