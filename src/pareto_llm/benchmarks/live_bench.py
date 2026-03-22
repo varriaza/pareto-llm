@@ -140,7 +140,7 @@ class LiveBenchBenchmark(Benchmark):
         if sample_size is not None or per_cat:
             by_cat: dict[str, list[dict]] = defaultdict(list)
             for q in all_questions:
-                by_cat[q["category"]].append(q)
+                by_cat[q.get("category", "unknown")].append(q)
 
             sampled: list[dict] = []
             rng = random.Random(seed)

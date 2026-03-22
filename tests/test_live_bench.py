@@ -159,6 +159,7 @@ def test_skip_agentic_false(tmp_path):
     with patch.object(bench, "_load_questions", return_value=all_qs):
         result = bench._get_filtered_questions()
     assert len(result) == 2
+    assert any(q.get("category") == "agentic_coding" for q in result)
 
 
 def test_sampling_global(tmp_path):
@@ -168,8 +169,8 @@ def test_sampling_global(tmp_path):
         result = bench._get_filtered_questions()
     coding_count = sum(1 for q in result if q["category"] == "coding")
     math_count = sum(1 for q in result if q["category"] == "math")
-    assert coding_count <= 3
-    assert math_count <= 3
+    assert coding_count == 3
+    assert math_count == 3
 
 
 def test_sampling_per_category_override(tmp_path):
@@ -187,8 +188,8 @@ def test_sampling_per_category_override(tmp_path):
         result = bench._get_filtered_questions()
     coding_count = sum(1 for q in result if q["category"] == "coding")
     math_count = sum(1 for q in result if q["category"] == "math")
-    assert coding_count <= 2  # per-category override wins
-    assert math_count <= 5  # global sample_size applies
+    assert coding_count == 2  # per-category override wins
+    assert math_count == 5  # global sample_size applies
 
 
 def test_sampling_seed_reproducible(tmp_path):
