@@ -296,7 +296,12 @@ class LiveBenchBenchmark(Benchmark):
         for cat in per_category_scores:
             per_category_scores[cat] /= per_category_counts[cat]
 
-        overall = sum(per_category_scores.values()) / len(per_category_scores) if per_category_scores else 0.0
+        if not per_category_scores:
+            raise RuntimeError(
+                f"No judgment scores found under {run_dir}. "
+                "Check that gen_judgments() wrote ground_truth_judgment.jsonl files."
+            )
+        overall = sum(per_category_scores.values()) / len(per_category_scores)
 
         return (
             BenchmarkResult(

@@ -126,10 +126,6 @@ def _make_questions(specs):
     return questions
 
 
-# Patch the instance method directly via patch.object
-_PATCH_LOAD = "pareto_llm.benchmarks.live_bench.LiveBenchBenchmark._load_questions"
-
-
 def test_category_filter_single(tmp_path):
     all_qs = _make_questions([("coding", False), ("coding", False), ("math", False)])
     bench = LiveBenchBenchmark(_valid_config(categories=["coding"], jobs_dir=str(tmp_path)))
