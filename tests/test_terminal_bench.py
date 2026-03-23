@@ -31,21 +31,22 @@ def _mock_harbor_installed(monkeypatch):
         "find_spec",
         lambda name: MagicMock() if name == "harbor" else _orig(name),
     )
-    for _mod in (
-        "harbor",
-        "harbor.models",
-        "harbor.models.registry",
-        "harbor.models.trial",
-        "harbor.models.trial.config",
-        "harbor.models.job",
-        "harbor.models.job.config",
-        "harbor.models.job.result",
-        "harbor.registry",
-        "harbor.registry.client",
-        "harbor.job",
-    ):
-        if _mod not in sys.modules:
-            monkeypatch.setitem(sys.modules, _mod, MagicMock())
+    if not _HARBOR_AVAILABLE:
+        for _mod in (
+            "harbor",
+            "harbor.models",
+            "harbor.models.registry",
+            "harbor.models.trial",
+            "harbor.models.trial.config",
+            "harbor.models.job",
+            "harbor.models.job.config",
+            "harbor.models.job.result",
+            "harbor.registry",
+            "harbor.registry.client",
+            "harbor.job",
+        ):
+            if _mod not in sys.modules:
+                monkeypatch.setitem(sys.modules, _mod, MagicMock())
 
 
 def _valid_config(**overrides):
