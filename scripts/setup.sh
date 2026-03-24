@@ -6,7 +6,7 @@ echo "Which GPU backend are you using?"
 echo "  1) CUDA  (NVIDIA GPU)"
 echo "  2) MLX   (Apple Silicon)"
 echo "  3) None"
-read -rp "Enter 1, 2, or 3: " choice
+printf "Enter 1, 2, or 3: "; read -r choice
 
 case "${choice}" in
     1) GPU_BACKEND="cuda" ;;
@@ -19,18 +19,17 @@ esac
 echo "==> Installing Python 3.12..."
 uv python install 3.12
 
-# ─── Install base + dev dependencies ─────────────────────────────────────────
+# ─── Install dependencies ─────────────────────────────────────────────────────
 echo "==> Installing dependencies..."
-uv sync --extra dev
-
-# ─── Install backend-specific extras ─────────────────────────────────────────
+EXTRAS=(--extra dev --extra live-bench --extra terminal-bench)
 if [ "${GPU_BACKEND}" = "cuda" ]; then
     echo "==> Installing CUDA extras (llama-cpp-python + uvicorn)..."
-    uv sync --extra cuda --extra dev
+    EXTRAS+=(--extra cuda)
 elif [ "${GPU_BACKEND}" = "mlx" ]; then
     echo "==> Installing MLX extras..."
-    uv sync --extra mlx --extra dev
+    EXTRAS+=(--extra mlx)
 fi
+uv sync "${EXTRAS[@]}"
 
 # ─── Write .env ───────────────────────────────────────────────────────────────
 echo "==> Writing .env..."
@@ -39,10 +38,6 @@ uv run python scripts/init_env.py --backend "${GPU_BACKEND}"
 # ─── Install pre-commit hooks ─────────────────────────────────────────────────
 echo "==> Installing pre-commit hooks..."
 uv run pre-commit install
-
-echo ""
-echo "Optional: To install LiveBench extras (for the live_bench benchmark type):"
-echo "  uv pip install \"pareto-llm[live-bench]\""
 
 echo ""
 echo "Setup complete. Run 'pareto-llm --help' to get started."

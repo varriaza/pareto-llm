@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import os
 import subprocess
 import sys
 import time
@@ -49,11 +50,21 @@ class LlamaCppBackend(LLMBackend):
         self._model_path = local_path
 
         self._n_gpu_layers = -1  # -1 means offload all layers to GPU
-        self._llama = Llama(
-            model_path=local_path,
-            n_gpu_layers=self._n_gpu_layers,
-            verbose=False,
-        )
+        # Suppress C-level stderr during construction to hide llama.cpp warnings
+        # (e.g. "n_ctx_seq < n_ctx_train") that bypass Python's verbose=False.
+        old_fd = os.dup(2)
+        null_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(null_fd, 2)
+        os.close(null_fd)
+        try:
+            self._llama = Llama(
+                model_path=local_path,
+                n_gpu_layers=self._n_gpu_layers,
+                verbose=False,
+            )
+        finally:
+            os.dup2(old_fd, 2)
+            os.close(old_fd)
 
     def generate(self, prompt: str, max_tokens: int = 512) -> GenerationResult:
         if self._llama is None:

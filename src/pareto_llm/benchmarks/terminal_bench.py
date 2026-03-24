@@ -111,10 +111,22 @@ class TerminalBenchmark(Benchmark):
         return filtered
 
     def run_single(self, backend: LLMBackend) -> tuple[BenchmarkResult, GenerationResult]:
+        import litellm
         from harbor.job import Job
         from harbor.models.job.config import JobConfig, OrchestratorConfig
         from harbor.models.job.result import JobResult
         from harbor.models.trial.config import AgentConfig
+
+        n_ctx = self.config["n_ctx"]
+        litellm.model_cost["openai/local"] = {
+            "max_tokens": n_ctx,
+            "max_input_tokens": n_ctx,
+            "max_output_tokens": n_ctx,
+            "input_cost_per_token": 0,
+            "output_cost_per_token": 0,
+            "litellm_provider": "openai",
+            "mode": "chat",
+        }
 
         port = self.config["port"]
 

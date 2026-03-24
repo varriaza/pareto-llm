@@ -21,7 +21,7 @@ mlx = [
     "uvicorn>=0.20",
 ]
 cuda = [
-    "llama-cpp-python>=0.2",
+    "llama-cpp-python>=0.3.33",
     "nvidia-ml-py>=12.0",
     "uvicorn>=0.20",
     "starlette-context>=0.3",
@@ -60,7 +60,7 @@ explicit = true
 
 [tool.uv.sources]
 llama-cpp-python = [
-    { index = "llama-cpp-python-cuda", extra = "cuda" },
+    { git = "https://github.com/JamePeng/llama-cpp-python.git", extra = "cuda" },
 ]
 
 [tool.ruff]
